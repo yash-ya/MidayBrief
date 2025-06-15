@@ -1,7 +1,18 @@
 package main
 
-import "fmt"
+import (
+	"MidayBrief/internal/router"
+	"MidayBrief/pkg/config"
+	"fmt"
+	"log"
+	"net/http"
+)
 
 func main() {
-	fmt.Println("Stand-up Summarizer bot starting...")
+	config.LoadEnv()
+	router.SetupRoutes()
+
+	port := ":8080"
+	fmt.Println("Listening on", port)
+	log.Fatal(http.ListenAndServe(port, nil))
 }
