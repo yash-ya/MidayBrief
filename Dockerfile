@@ -22,7 +22,7 @@ WORKDIR /app
 COPY --from=builder /app/midaybrief .
 
 # Expose the app port
-EXPOSE 3000
+EXPOSE 8080
 
 # Run the binary
 CMD ["./midaybrief"]
