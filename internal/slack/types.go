@@ -22,3 +22,21 @@ type Team struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
+
+type urlVerification struct {
+	Challenge string `json:"challenge"`
+	Type      string `json:"type"`
+}
+
+type SlackEvent struct {
+	Type  string         `json:"type"`
+	Event SlackEventData `json:"event"`
+}
+
+type SlackEventData struct {
+	Type        string `json:"type"`
+	User        string `json:"user"`
+	Text        string `json:"text"`
+	Channel     string `json:"channel"`
+	ChannelType string `json:"channel_type"`
+}
