@@ -1,28 +1,28 @@
 # Stage 1: Build the Go binary
-FROM golang:1.21 AS builder
+FROM golang:1.21 as builder
 
 WORKDIR /app
 
-# Copy go.mod and go.sum first (for caching deps)
+# Copy and download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy the rest of the app
 COPY . .
 
-# Build the binary
-RUN go build -o midaybrief ./cmd
+# 🔧 Build statically linked binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o midaybrief ./cmd
 
-# Stage 2: Create a minimal image with just the binary
-FROM debian:bullseye-slim
+# Stage 2: Minimal image
+FROM scratch
 
 WORKDIR /app
 
-# Copy binary from builder stage
+# Copy binary from builder
 COPY --from=builder /app/midaybrief .
 
 # Expose the app port
 EXPOSE 8080
 
-# Run the binary
+# Run
 CMD ["./midaybrief"]
