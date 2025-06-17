@@ -29,6 +29,12 @@ func SaveTeamConfig(team TeamConfig) error {
 	return nil
 }
 
+func GetAllTeamConfigs() ([]TeamConfig, error) {
+	var teams []TeamConfig
+	err := DB.Find(&teams).Error
+	return teams, err
+}
+
 func GetTeamConfig(teamID string) (*TeamConfig, error) {
 	var team TeamConfig
 	err := DB.Where("team_id = ?", teamID).First(&team).Error

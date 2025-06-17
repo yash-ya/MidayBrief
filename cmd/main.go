@@ -11,7 +11,7 @@ import (
 
 func main() {
 	db.Init()
-	scheduler.StartScheduler()
+	go scheduler.StartScheduler()
 
 	router := SetupRouter()
 

@@ -7,31 +7,44 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"github.com/robfig/cron/v3"
 )
 
 func StartScheduler() {
-	c := cron.New()
+	ticker := time.NewTicker(1 * time.Minute)
+	log.Println("Scheduler started...")
 
-	c.AddFunc("@every 1m", func() {
-		currentTime := time.Now().UTC().Format("15:04")
-		var teams []db.TeamConfig
-
-		if err := db.DB.Where("post_time = ?", currentTime).Find(&teams).Error; err != nil {
-			log.Printf("StartScheduler: failed to query teams for time %s: %v", currentTime, err)
-			return
-		}
-
-		for _, team := range teams {
-			go PostSummaryForTeam(team)
-		}
-	})
-
-	c.Start()
+	for range ticker.C {
+		runScheduledSummaries()
+	}
 }
 
-func PostSummaryForTeam(team db.TeamConfig) {
+func runScheduledSummaries() {
+	teams, err := db.GetAllTeamConfigs()
+	if err != nil {
+		log.Println("Failed to fetch team configs:", err)
+		return
+	}
+
+	for _, team := range teams {
+		if team.PostTime == "" || team.Timezone == "" || team.ChannelID == "" {
+			continue
+		}
+
+		loc, err := time.LoadLocation(team.Timezone)
+		if err != nil {
+			log.Printf("Invalid timezone for team %s: %s\n", team.TeamID, team.Timezone)
+			continue
+		}
+
+		now := time.Now().In(loc).Format("15:04")
+		if now == team.PostTime {
+			log.Printf("Triggering summary for team %s at %s (%s)", team.TeamID, now, team.Timezone)
+			go postSummaryForTeam(team)
+		}
+	}
+}
+
+func postSummaryForTeam(team db.TeamConfig) {
 	if team.AccessToken == "" || team.ChannelID == "" {
 		log.Printf("PostSummaryForTeam: missing credentials for team %s", team.TeamID)
 		return
