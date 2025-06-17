@@ -32,3 +32,7 @@ func GetMessagesForTeamToday(teamID string) ([]UserMessage, error) {
 	}
 	return messages, nil
 }
+
+func CleanupMessages(teamID string) error {
+	return DB.Where("team_id = ?", teamID).Delete(&UserMessage{}).Error
+}
