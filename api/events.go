@@ -33,12 +33,19 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	team, err := db.GetTeamConfig(event.TeamID)
+
+	if err != nil {
+		http.Error(w, "Team not configured", http.StatusBadRequest)
+		return
+	}
+
 	if event.Event.Type == "message" && event.Event.ChannelType == "im" {
 		if strings.HasPrefix(event.Event.Text, "config <#") {
 			handleChannelConfig(event)
 		} else if strings.HasPrefix(event.Event.Text, "post time"){
 			handlePostTime(event)
-		} else {
+		} else if team.BotUserID != event.Event.User {
 			fmt.Printf("New DM from user %s: %s\n", event.Event.User, event.Event.Text)
 			postToStandUpsChannel(event.TeamID, event.Event.User, event.Event.Text)
 		}
