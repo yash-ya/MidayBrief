@@ -1,27 +1,26 @@
 package main
 
 import (
-	"MidayBrief/db"
-	"MidayBrief/internal/router"
-	"MidayBrief/pkg/config"
-	"fmt"
 	"log"
 	"net/http"
+	"os"
+
+	"MidayBrief/db"
 )
 
 func main() {
-	config.LoadEnv()
 	db.Init()
+	//scheduler.StartScheduler()
 
-	err := db.DB.AutoMigrate(&db.TeamConfig{}, &db.UserMessage{})
-	if err != nil {
-        log.Fatal("Auto migration failed:", err)
-    }
-    log.Println("DB auto migration done")
+	router := SetupRouter()
 
-	router.SetupRoutes()
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 
-	port := ":8080"
-	fmt.Println("Listening on", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Println("Server running on port", port)
+	if err := http.ListenAndServe(":"+port, router); err != nil {
+		log.Fatal("Server failed:", err)
+	}
 }

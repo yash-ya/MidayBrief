@@ -1,7 +1,8 @@
-package slack
+package api
 
 import (
 	"MidayBrief/db"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -64,7 +65,7 @@ func handlePostTime(event SlackEvent) {
 	}
 
 	sendDM(event.TeamID, event.Event.Channel,
-		fmt.Sprintf("Got it! I'll post your team's updates daily at `%s` UTC.", postTime))
+		fmt.Sprintf("Got it! I'll post your team's updates daily at `%s`.", postTime))
 }
 
 func handleChannelConfig(event SlackEvent) {
@@ -105,4 +106,36 @@ func extractChannelID(text string) string {
 func handleConfigError(field, teamID string, err error, event SlackEvent) {
 	log.Printf("Failed to update %s in team config for %s: %v", field, teamID, err)
 	sendDM(event.TeamID, event.Event.Channel, fmt.Sprintf("Something went wrong while updating your %s.", field))
+}
+
+type SlackMessage struct {
+	Channel string `json:"channel"`
+	Text    string `json:"text"`
+}
+
+func SendMessage(token, channel, text string) error {
+	msg := SlackMessage{
+		Channel: channel,
+		Text:    text,
+	}
+	body, _ := json.Marshal(msg)
+
+	req, err := http.NewRequest("POST", "https://slack.com/api/chat.postMessage", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Slack API returned non-200: %s", resp.Status)
+	}
+
+	return nil
 }

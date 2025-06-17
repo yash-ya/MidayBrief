@@ -1,4 +1,4 @@
-package slack
+package api
 
 type OAuthResponse struct {
 	Ok                  bool       `json:"ok"`

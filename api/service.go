@@ -1,4 +1,4 @@
-package slack
+package api
 
 import (
 	"MidayBrief/db"
