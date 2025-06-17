@@ -16,6 +16,6 @@ type UserMessage struct {
     ID        uint      `gorm:"primaryKey"`
     TeamID    string    `gorm:"index;not null"`
     UserID    string    `gorm:"not null"`
-    Message      string    `gorm:"type:text;not null"`
-    Timestamp time.Time `gorm:"default:CURRENT_TIMESTAMP"`
+    Message   string    `gorm:"not null"`
+    Timestamp time.Time 
 }
