@@ -6,11 +6,12 @@ import (
 	"os"
 
 	"MidayBrief/db"
+	"MidayBrief/scheduler"
 )
 
 func main() {
 	db.Init()
-	//scheduler.StartScheduler()
+	scheduler.StartScheduler()
 
 	router := SetupRouter()
 
