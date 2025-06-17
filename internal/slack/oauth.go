@@ -20,9 +20,6 @@ func HandleSlackInstall(w http.ResponseWriter, r *http.Request) {
 	clientID := os.Getenv("SLACK_CLIENT_ID")
 	baseURL := os.Getenv("BASE_URL")
 
-	log.Println("ClientID - ", clientID)
-	log.Println("BaseURL - ", baseURL)
-
 	redirect := fmt.Sprintf(
 		"%s?client_id=%s&scope=%s&redirect_uri=%s/slack/oauth/callback", 
 		SlackOAuthAuthorizeURL, 
@@ -50,12 +47,12 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		"client_secret": {clientSecret},
 		"redirect_uri":  {redirectURI},
 	})
-
+	body, _ := io.ReadAll(response.Body)
+	log.Println("Slack OAuth Response:", string(body))
 	if error != nil {
 		http.Error(w, "OAuth request failed", http.StatusInternalServerError)
 		return
 	}
-	body, _ := io.ReadAll(response.Body)
 
 	var oauthResponse OAuthResponse
 	if err := json.Unmarshal(body, &oauthResponse); err!=nil {
