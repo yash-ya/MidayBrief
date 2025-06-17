@@ -38,3 +38,13 @@ func UpdateChannelID(teamID, channelID string) error {
             "updated_at": now,
         }).Error
 }
+
+func UpdatePostTime(teamID, postTime string) error {
+	now := time.Now().UTC()
+    return DB.Model(&TeamConfig{}).
+        Where("team_id = ?", teamID).
+        Updates(map[string]any{
+            "post_time": postTime,
+            "updated_at": now,
+        }).Error
+}
