@@ -41,18 +41,19 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	clientSecret := os.Getenv("SLACK_CLIENT_SECRET")
 	redirectURI := os.Getenv("BASE_URL") + "/slack/oauth/callback"
 
-	response, error := http.PostForm(SlackOAuthTokenURL, url.Values{
+	response, err := http.PostForm(SlackOAuthTokenURL, url.Values{
 		"code":          {code},
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
 		"redirect_uri":  {redirectURI},
 	})
-	body, _ := io.ReadAll(response.Body)
-	log.Println("Slack OAuth Response:", string(body))
-	if error != nil {
+
+	if err != nil {
+		log.Println("Error making OAuth request:", err)
 		http.Error(w, "OAuth request failed", http.StatusInternalServerError)
 		return
 	}
+	body, _ := io.ReadAll(response.Body)
 
 	var oauthResponse OAuthResponse
 	if err := json.Unmarshal(body, &oauthResponse); err!=nil {
