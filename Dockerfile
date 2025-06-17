@@ -1,28 +1,25 @@
-# Stage 1: Build the Go binary
+# Stage 1: Build
 FROM golang:1.21 as builder
 
 WORKDIR /app
 
-# Copy and download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the rest of the app
 COPY . .
 
-# 🔧 Build statically linked binary
+# Build static binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o midaybrief ./cmd
 
-# Stage 2: Minimal image
-FROM scratch
+# Stage 2: Use distroless image with certs
+FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /app
 
-# Copy binary from builder
 COPY --from=builder /app/midaybrief .
 
-# Expose the app port
+# Expose port
 EXPOSE 8080
 
-# Run
-CMD ["./midaybrief"]
+# Run binary
+CMD ["/app/midaybrief"]
