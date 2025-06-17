@@ -11,12 +11,16 @@ import (
 var DB *gorm.DB
 
 func Init() {
-	dns := os.Getenv("DATABASE_URL")
-	var err error
-	DB, err = gorm.Open(postgres.Open(dns), &gorm.Config{})
-	if err != nil {
-        log.Fatal("❌ Failed to connect to DB:", err)
-    }
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("Environment variable DATABASE_URL is not set")
+	}
 
-    log.Println("✅ Connected to DB")
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect to the database: %v", err)
+	}
+
+	log.Println("Database connection established")
 }

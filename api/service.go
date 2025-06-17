@@ -5,66 +5,88 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
 func sendDM(teamID, userChannelID, message string) {
-	team, err := db.GetTeamConfig(teamID);
+	team, err := db.GetTeamConfig(teamID)
 	if err != nil {
-		fmt.Println("Not able to find the team in db", err)
+		log.Printf("sendDM: failed to get team config for %s: %v", teamID, err)
 		return
 	}
 
-	var url = "https://slack.com/api/chat.postMessage"
 	payload := map[string]string{
 		"channel": userChannelID,
 		"text":    message,
 	}
 
-	jsonBody, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
-
-	client := &http.Client{}
-	client.Do(req)
-}
-
-func postToStandUpsChannel(teamID, userID, message string) {
-	team, err := db.GetTeamConfig(teamID);
+	body, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Println("Not able to find the team in db", err)
+		log.Printf("sendDM: failed to marshal payload: %v", err)
 		return
 	}
 
-	saveErrMessage := db.SaveUserMessage(teamID, userID, message)
-	if saveErrMessage != nil {
-		fmt.Println("Unable to save user message in DB", saveErrMessage)
-	}else {
-		fmt.Println("User message is saved in DB")
+	req, err := http.NewRequest("POST", slackPostMessages, bytes.NewBuffer(body))
+	if err != nil {
+		log.Printf("sendDM: failed to create request: %v", err)
+		return
 	}
-
-	payload := map[string]string{
-
-		"channel": team.ChannelID,
-		"text":    fmt.Sprintf("*Update from <@%s>*:\n%s", userID, message),
-	}
-	jsonBody, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", "https://slack.com/api/chat.postMessage", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Failed to post message:", err)
+		log.Printf("sendDM: failed to send request: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		fmt.Println("Slack API responded with:", resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("sendDM: Slack API responded with status %s", resp.Status)
+	}
+}
+
+func postToStandUpsChannel(teamID, userID, message string) {
+	team, err := db.GetTeamConfig(teamID)
+	if err != nil {
+		log.Printf("postToStandUpsChannel: failed to get team config for %s: %v", teamID, err)
+		return
+	}
+
+	if err := db.SaveUserMessage(teamID, userID, message); err != nil {
+		log.Printf("postToStandUpsChannel: failed to save user message: %v", err)
+	} else {
+		log.Printf("User message saved for team %s, user %s", teamID, userID)
+	}
+
+	payload := map[string]string{
+		"channel": team.ChannelID,
+		"text":    fmt.Sprintf("Update from <@%s>:\n%s", userID, message),
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("postToStandUpsChannel: failed to marshal payload: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest("POST", slackPostMessages, bytes.NewBuffer(body))
+	if err != nil {
+		log.Printf("postToStandUpsChannel: failed to create request: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("postToStandUpsChannel: failed to send request: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("postToStandUpsChannel: Slack API responded with status %s", resp.Status)
 	}
 }

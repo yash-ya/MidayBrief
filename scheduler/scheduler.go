@@ -12,40 +12,46 @@ import (
 )
 
 func StartScheduler() {
-    c := cron.New()
+	c := cron.New()
 
-    c.AddFunc("@every 1m", func() {
-        nowUTC := time.Now().UTC().Format("15:04") // current time as HH:MM
-        var teams []db.TeamConfig
-        if err := db.DB.Where("post_time = ?", nowUTC).Find(&teams).Error; err != nil {
-            log.Println("Failed to query team configs for cron:", err)
-            return
-        }
+	c.AddFunc("@every 1m", func() {
+		currentTime := time.Now().UTC().Format("15:04")
+		var teams []db.TeamConfig
 
-        for _, team := range teams {
-            go PostSummaryForTeam(team)
-        }
-    })
+		if err := db.DB.Where("post_time = ?", currentTime).Find(&teams).Error; err != nil {
+			log.Printf("StartScheduler: failed to query teams for time %s: %v", currentTime, err)
+			return
+		}
 
-    c.Start()
+		for _, team := range teams {
+			go PostSummaryForTeam(team)
+		}
+	})
+
+	c.Start()
 }
 
 func PostSummaryForTeam(team db.TeamConfig) {
-	messages, err := db.GetMessagesForTeamToday(team.TeamID)
-	if err != nil {
-		log.Println("Error fetching messages for team:", err)
+	if team.AccessToken == "" || team.ChannelID == "" {
+		log.Printf("PostSummaryForTeam: missing credentials for team %s", team.TeamID)
 		return
 	}
+
+	messages, err := db.GetMessagesForTeamToday(team.TeamID)
+	if err != nil {
+		log.Printf("PostSummaryForTeam: error fetching messages for team %s: %v", team.TeamID, err)
+		return
+	}
+
 	if len(messages) == 0 {
-		log.Println("No messages for team:", team.TeamID)
+		log.Printf("PostSummaryForTeam: no messages found for team %s", team.TeamID)
 		return
 	}
 
 	summary := formatSummary(messages)
 
-	err = api.SendMessage(team.AccessToken, team.ChannelID, summary)
-	if err != nil {
-		log.Println("Failed to post summary to Slack:", err)
+	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
+		log.Printf("PostSummaryForTeam: failed to post summary to Slack for team %s: %v", team.TeamID, err)
 	}
 }
 
@@ -57,7 +63,7 @@ func formatSummary(messages []db.UserMessage) string {
 	}
 
 	var summary strings.Builder
-	summary.WriteString("*📢 Team Daily Standup Summary:*\n")
+	summary.WriteString("Team Daily Standup Summary:\n")
 
 	for userID, updates := range userMap {
 		summary.WriteString(fmt.Sprintf("\n• <@%s>\n", userID))

@@ -11,73 +11,85 @@ import (
 	"os"
 )
 
-const (
-	SlackOAuthAuthorizeURL   = "https://slack.com/oauth/v2/authorize"
-	SlackOAuthTokenURL       = "https://slack.com/api/oauth.v2.access"
-	SlackOAuthAuthorizeScope = "chat:write,users:read,channels:read,groups:read"
-)
-
 func HandleSlackInstall(w http.ResponseWriter, r *http.Request) {
 	clientID := os.Getenv("SLACK_CLIENT_ID")
 	baseURL := os.Getenv("BASE_URL")
+	if clientID == "" || baseURL == "" {
+		http.Error(w, "Slack Client ID or Base URL not configured", http.StatusInternalServerError)
+		return
+	}
 
 	redirect := fmt.Sprintf(
-		"%s?client_id=%s&scope=%s&redirect_uri=%s/slack/oauth/callback", 
-		SlackOAuthAuthorizeURL, 
-		clientID, 
-		SlackOAuthAuthorizeScope, 
-		baseURL)
-	
+		"%s?client_id=%s&scope=%s&redirect_uri=%s/slack/oauth/callback",
+		slackOAuthAuthorizeURL,
+		clientID,
+		slackOAuthAuthorizeScope,
+		baseURL,
+	)
+
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
 func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Error(w, "Missing code", http.StatusBadRequest)
+		http.Error(w, "Missing authorization code", http.StatusBadRequest)
 		return
 	}
 
 	clientID := os.Getenv("SLACK_CLIENT_ID")
 	clientSecret := os.Getenv("SLACK_CLIENT_SECRET")
-	redirectURI := os.Getenv("BASE_URL") + "/slack/oauth/callback"
+	baseURL := os.Getenv("BASE_URL")
+	if clientID == "" || clientSecret == "" || baseURL == "" {
+		http.Error(w, "Missing Slack credentials or base URL", http.StatusInternalServerError)
+		return
+	}
 
-	response, err := http.PostForm(SlackOAuthTokenURL, url.Values{
+	redirectURI := baseURL + slackCallbackEndpoint
+
+	resp, err := http.PostForm(slackOAuthTokenURL, url.Values{
 		"code":          {code},
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
 		"redirect_uri":  {redirectURI},
 	})
-
 	if err != nil {
-		log.Println("Error making OAuth request:", err)
+		log.Printf("OAuth request error: %v", err)
 		http.Error(w, "OAuth request failed", http.StatusInternalServerError)
 		return
 	}
-	body, _ := io.ReadAll(response.Body)
+	defer resp.Body.Close()
 
-	var oauthResponse OAuthResponse
-	if err := json.Unmarshal(body, &oauthResponse); err!=nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Failed to read OAuth response", http.StatusInternalServerError)
+		return
+	}
+
+	var oauthResp OAuthResponse
+	if err := json.Unmarshal(body, &oauthResp); err != nil {
 		http.Error(w, "Failed to parse Slack OAuth response", http.StatusInternalServerError)
 		return
 	}
 
-	if !oauthResponse.Ok {
-		http.Error(w, "Slack error: "+oauthResponse.Error, http.StatusBadRequest)
+	if !oauthResp.Ok {
+		http.Error(w, fmt.Sprintf("Slack error: %s", oauthResp.Error), http.StatusBadRequest)
 		return
 	}
 
-	team := db.TeamConfig {
-		TeamID: oauthResponse.Team.ID,
-		AccessToken: oauthResponse.AccessToken,
-		BotUserID: oauthResponse.BotUserID,
+	team := db.TeamConfig{
+		TeamID:      oauthResp.Team.ID,
+		AccessToken: oauthResp.AccessToken,
+		BotUserID:   oauthResp.BotUserID,
 	}
 
 	if err := db.SaveTeamConfig(team); err != nil {
-		log.Println("Failed to save team config:", err)
-	} else {
-		log.Println("Team config saved for:", team.TeamID)
+		log.Printf("Failed to save team config: %v", err)
+		http.Error(w, "Failed to save team configuration", http.StatusInternalServerError)
+		return
 	}
 
-	fmt.Printf("OAuth successful for team %s (%s). Bot token: %s\n", oauthResponse.Team.Name, oauthResponse.Team.ID, oauthResponse.AccessToken)
+	log.Printf("OAuth successful for team %s (%s)", oauthResp.Team.Name, oauthResp.Team.ID)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Slack app installed successfully"))
 }

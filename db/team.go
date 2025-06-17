@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -17,34 +18,52 @@ func SaveTeamConfig(team TeamConfig) error {
 		team.CreatedAt = now
 	}
 
-	return DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "team_id"}},
+	err := DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "team_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"access_token", "bot_user_id", "updated_at"}),
 	}).Create(&team).Error
+
+	if err != nil {
+		return fmt.Errorf("SaveTeamConfig: failed to save team %s: %w", team.TeamID, err)
+	}
+	return nil
 }
 
 func GetTeamConfig(teamID string) (*TeamConfig, error) {
 	var team TeamConfig
 	err := DB.Where("team_id = ?", teamID).First(&team).Error
-	return &team, err
+	if err != nil {
+		return nil, fmt.Errorf("GetTeamConfig: failed to retrieve team %s: %w", teamID, err)
+	}
+	return &team, nil
 }
 
 func UpdateChannelID(teamID, channelID string) error {
-    now := time.Now().UTC()
-    return DB.Model(&TeamConfig{}).
-        Where("team_id = ?", teamID).
-        Updates(map[string]any{
-            "channel_id": channelID,
-            "updated_at": now,
-        }).Error
+	now := time.Now().UTC()
+	err := DB.Model(&TeamConfig{}).
+		Where("team_id = ?", teamID).
+		Updates(map[string]any{
+			"channel_id": channelID,
+			"updated_at": now,
+		}).Error
+
+	if err != nil {
+		return fmt.Errorf("UpdateChannelID: failed for team %s: %w", teamID, err)
+	}
+	return nil
 }
 
 func UpdatePostTime(teamID, postTime string) error {
 	now := time.Now().UTC()
-    return DB.Model(&TeamConfig{}).
-        Where("team_id = ?", teamID).
-        Updates(map[string]any{
-            "post_time": postTime,
-            "updated_at": now,
-        }).Error
+	err := DB.Model(&TeamConfig{}).
+		Where("team_id = ?", teamID).
+		Updates(map[string]any{
+			"post_time":  postTime,
+			"updated_at": now,
+		}).Error
+
+	if err != nil {
+		return fmt.Errorf("UpdatePostTime: failed for team %s: %w", teamID, err)
+	}
+	return nil
 }
