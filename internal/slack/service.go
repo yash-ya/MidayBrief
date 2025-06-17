@@ -1,17 +1,21 @@
 package slack
 
 import (
+	"MidayBrief/db"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 )
 
-func sendDM(userChannelID, message string) {
-	var url = "https://slack.com/api/chat.postMessage"
-	botToken := os.Getenv("SLACK_BOT_TOKEN")
+func sendDM(teamID, userChannelID, message string) {
+	team, err := db.GetTeamConfig(teamID);
+	if err != nil {
+		fmt.Println("Not able to find the team in db", err)
+		return
+	}
 
+	var url = "https://slack.com/api/chat.postMessage"
 	payload := map[string]string{
 		"channel": userChannelID,
 		"text":    message,
@@ -20,29 +24,36 @@ func sendDM(userChannelID, message string) {
 	jsonBody, _ := json.Marshal(payload)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+botToken)
+	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
 
 	client := &http.Client{}
 	client.Do(req)
 }
 
-func postToStandUpsChannel(userID, message string) {
-	botToken := os.Getenv("SLACK_BOT_TOKEN")
-	channelID := userChannelMap[userID]
-	if channelID == "" {
-		channelID = "C091DGFPE6S" // fallback if not set
+func postToStandUpsChannel(teamID, userID, message string) {
+	team, err := db.GetTeamConfig(teamID);
+	if err != nil {
+		fmt.Println("Not able to find the team in db", err)
+		return
+	}
+
+	saveErrMessage := db.SaveUserMessage(teamID, userID, message)
+	if saveErrMessage != nil {
+		fmt.Println("Unable to save user message in DB", saveErrMessage)
+	}else {
+		fmt.Println("User message is saved in DB")
 	}
 
 	payload := map[string]string{
 
-		"channel": channelID,
+		"channel": team.ChannelID,
 		"text":    fmt.Sprintf("*Update from <@%s>*:\n%s", userID, message),
 	}
 	jsonBody, _ := json.Marshal(payload)
 
 	req, _ := http.NewRequest("POST", "https://slack.com/api/chat.postMessage", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+botToken)
+	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

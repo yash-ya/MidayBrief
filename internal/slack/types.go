@@ -29,8 +29,9 @@ type urlVerification struct {
 }
 
 type SlackEvent struct {
-	Type  string         `json:"type"`
-	Event SlackEventData `json:"event"`
+	Type   string         `json:"type"`
+	TeamID string         `json:"team_id"`
+	Event  SlackEventData `json:"event"`
 }
 
 type SlackEventData struct {

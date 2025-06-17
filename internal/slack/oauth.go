@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 )
 
 const (
@@ -72,8 +71,6 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		TeamID: oauthResponse.Team.ID,
 		AccessToken: oauthResponse.AccessToken,
 		BotUserID: oauthResponse.BotUserID,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
 	}
 
 	if err := db.SaveTeamConfig(team); err != nil {

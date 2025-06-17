@@ -1,15 +1,15 @@
 package slack
 
 import (
+	"MidayBrief/db"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 )
-
-var userChannelMap = make(map[string]string)
 
 func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
@@ -37,7 +37,7 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 			handleChannelConfig(event);
 		} else {
 			fmt.Printf("New DM from user %s: %s\n", event.Event.User, event.Event.Text)
-			postToStandUpsChannel(event.Event.User, event.Event.Text)
+			postToStandUpsChannel(event.TeamID, event.Event.User, event.Event.Text)
 		}
 	}
 
@@ -48,11 +48,15 @@ func handleChannelConfig(event SlackEvent) {
 	re := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
 	matches := re.FindStringSubmatch(event.Event.Text)
 	if len(matches) < 2 {
-		sendDM(event.Event.Channel, "Couldn't find a valid channel reference. Try: `config #standups` (use autocomplete).")
+		sendDM(event.TeamID, event.Event.Channel, "Couldn't find a valid channel reference. Try: `config #standups` (use autocomplete).")
 		return
 	}
 	channelID := matches[1]
 
-	userChannelMap[event.Event.User] = channelID
-	sendDM(event.Event.Channel, fmt.Sprintf("Got it! I’ll post your updates to <#%s>", channelID))
+	if err := db.UpdateChannelID(event.TeamID, channelID); err != nil {
+		log.Println("Failed to update channelID in team config:", err)
+	} else {
+		log.Println("ChannelID is updated in team config for:", event.TeamID)
+	}
+	sendDM(event.TeamID, event.Event.Channel, fmt.Sprintf("Got it! I'll post your updates to <#%s>", channelID))
 }

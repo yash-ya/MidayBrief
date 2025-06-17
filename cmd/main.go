@@ -15,9 +15,9 @@ func main() {
 
 	err := db.DB.AutoMigrate(&db.TeamConfig{}, &db.UserMessage{})
 	if err != nil {
-        log.Fatal("❌ Auto migration failed:", err)
+        log.Fatal("Auto migration failed:", err)
     }
-    log.Println("✅ DB auto migration done")
+    log.Println("DB auto migration done")
 
 	router.SetupRoutes()
 
