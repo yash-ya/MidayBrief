@@ -8,6 +8,8 @@ type TeamConfig struct {
     AccessToken  string    `gorm:"not null"`
     BotUserID    string
     ChannelID    string
+    PostTime     string
+    Timezone     string
     CreatedAt    time.Time
     UpdatedAt    time.Time
 }

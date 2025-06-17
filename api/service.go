@@ -27,7 +27,7 @@ func sendDM(teamID, userChannelID, message string) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", slackPostMessages, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("sendDM: failed to create request: %v", err)
 		return
@@ -71,7 +71,7 @@ func postToStandUpsChannel(teamID, userID, message string) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", slackPostMessages, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("postToStandUpsChannel: failed to create request: %v", err)
 		return

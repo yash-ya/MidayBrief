@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -33,23 +32,24 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch team config
 	team, err := db.GetTeamConfig(event.TeamID)
 	if err != nil {
 		http.Error(w, "Team not configured", http.StatusBadRequest)
 		return
 	}
 
-	if event.Event.Type != "message" || event.Event.ChannelType != "im" {
+	// Only handle DMs (IM) and non-bot messages
+	if event.Event.Type != "message" || event.Event.ChannelType != "im" || event.Event.User == team.BotUserID {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
+	text := strings.ToLower(event.Event.Text)
 	switch {
-	case strings.HasPrefix(event.Event.Text, "config <#"):
-		handleChannelConfig(event)
-	case strings.HasPrefix(event.Event.Text, "post time"):
-		handlePostTime(event)
-	case team.BotUserID != event.Event.User:
+	case strings.Contains(text, "config") || strings.Contains(text, "post time") || strings.Contains(text, "timezone"):
+		handleCombinedConfig(event)
+	default:
 		fmt.Printf("New DM from user %s: %s\n", event.Event.User, event.Event.Text)
 		postToStandUpsChannel(event.TeamID, event.Event.User, event.Event.Text)
 	}
@@ -57,62 +57,46 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func handlePostTime(event SlackEvent) {
-	postTime := extractValueAfterCommand(event.Event.Text, "post time")
-	if postTime == "" {
-		sendDM(event.TeamID, event.Event.Channel, "Please provide time like: post time 17:00")
-		return
+func handleCombinedConfig(event SlackEvent) {
+	text := event.Event.Text
+	reChan := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
+	reTime := regexp.MustCompile(`post time (\d{2}:\d{2})`)
+	reZone := regexp.MustCompile(`timezone ([A-Za-z]+/[A-Za-z_]+)`)
+
+	channelMatch := reChan.FindStringSubmatch(text)
+	timeMatch := reTime.FindStringSubmatch(text)
+	zoneMatch := reZone.FindStringSubmatch(text)
+
+	var updates []string
+
+	if len(channelMatch) == 2 {
+		if err := db.UpdateChannelID(event.TeamID, channelMatch[1]); err == nil {
+			updates = append(updates, "channel")
+		}
 	}
 
-	if _, err := time.Parse("15:04", postTime); err != nil {
-		sendDM(event.TeamID, event.Event.Channel, "Invalid time format. Use 24-hr format like 17:00 (UTC).")
-		return
+	if len(timeMatch) == 2 {
+		if _, err := time.Parse("15:04", timeMatch[1]); err == nil {
+			if err := db.UpdatePostTime(event.TeamID, timeMatch[1]); err == nil {
+				updates = append(updates, "post time")
+			}
+		}
 	}
 
-	if err := db.UpdatePostTime(event.TeamID, postTime); err != nil {
-		handleConfigError("post time", event.TeamID, err, event)
-		return
+	if len(zoneMatch) == 2 {
+		if _, err := time.LoadLocation(zoneMatch[1]); err == nil {
+			if err := db.UpdateTimezone(event.TeamID, zoneMatch[1]); err == nil {
+				updates = append(updates, "timezone")
+			}
+		}
 	}
 
-	sendDM(event.TeamID, event.Event.Channel, fmt.Sprintf("Got it! I'll post your team's updates daily at %s.", postTime))
-}
-
-func handleChannelConfig(event SlackEvent) {
-	channelID := extractChannelID(event.Event.Text)
-	if channelID == "" {
-		sendDM(event.TeamID, event.Event.Channel, "Couldn't find a valid channel reference. Try: config #standups (use autocomplete).")
-		return
+	if len(updates) > 0 {
+		msg := fmt.Sprintf("✅ Updated: %s", strings.Join(updates, ", "))
+		sendDM(event.TeamID, event.Event.Channel, msg)
+	} else {
+		sendDM(event.TeamID, event.Event.Channel, "No valid configuration found. Try: `config #channel`, `post time 17:00`, or `timezone Asia/Kolkata`.")
 	}
-
-	if err := db.UpdateChannelID(event.TeamID, channelID); err != nil {
-		handleConfigError("channel ID", event.TeamID, err, event)
-		return
-	}
-
-	sendDM(event.TeamID, event.Event.Channel, fmt.Sprintf("Got it! I'll post your updates to <#%s>", channelID))
-}
-
-func extractValueAfterCommand(text, cmd string) string {
-	text = strings.TrimSpace(text)
-	parts := strings.SplitN(text, cmd, 2)
-	if len(parts) < 2 {
-		return ""
-	}
-	return strings.TrimSpace(parts[1])
-}
-
-func extractChannelID(text string) string {
-	re := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
-	matches := re.FindStringSubmatch(text)
-	if len(matches) < 2 {
-		return ""
-	}
-	return matches[1]
-}
-
-func handleConfigError(field, teamID string, err error, event SlackEvent) {
-	log.Printf("Failed to update %s for team %s: %v", field, teamID, err)
-	sendDM(event.TeamID, event.Event.Channel, fmt.Sprintf("An error occurred while updating your %s.", field))
 }
 
 type SlackMessage struct {
@@ -130,7 +114,7 @@ func SendMessage(token, channel, text string) error {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", slackPostMessages, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

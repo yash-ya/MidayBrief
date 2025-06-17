@@ -67,3 +67,18 @@ func UpdatePostTime(teamID, postTime string) error {
 	}
 	return nil
 }
+
+func UpdateTimezone(teamID, timezone string) error {
+	now := time.Now().UTC()
+	err := DB.Model(&TeamConfig{}).
+		Where("team_id = ?", teamID).
+		Updates(map[string]any{
+			"timezone":  timezone,
+			"updated_at": now,
+		}).Error
+
+	if err != nil {
+		return fmt.Errorf("UpdateTimezone: failed for team %s: %w", teamID, err)
+	}
+	return nil
+}

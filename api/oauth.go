@@ -89,6 +89,8 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sendDM(oauthResp.Team.ID, oauthResp.AuthedUser.ID, slackWelcomeMessage)
+
 	log.Printf("OAuth successful for team %s (%s)", oauthResp.Team.Name, oauthResp.Team.ID)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Slack app installed successfully"))
