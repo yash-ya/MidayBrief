@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,9 @@ const (
 func HandleSlackInstall(w http.ResponseWriter, r *http.Request) {
 	clientID := os.Getenv("SLACK_CLIENT_ID")
 	baseURL := os.Getenv("BASE_URL")
+
+	log.Println("ClientID - ", clientID)
+	log.Println("BaseURL - ", baseURL)
 
 	redirect := fmt.Sprintf(
 		"%s?client_id=%s&scope=%s&redirect_uri=%s/slack/oauth/callback", 
