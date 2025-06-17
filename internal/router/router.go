@@ -7,7 +7,7 @@ import (
 
 func SetupRoutes() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("✅ MidayBrief is alive"))
+		w.Write([]byte("MidayBrief is alive"))
 	})
 	http.HandleFunc("/slack/install", slack.HandleSlackInstall)
 	http.HandleFunc("/slack/oauth/callback", slack.HandleSlackOAuthCallback)

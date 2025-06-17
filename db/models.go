@@ -5,7 +5,6 @@ import "time"
 type TeamConfig struct {
     ID           uint      `gorm:"primaryKey"`
     TeamID       string    `gorm:"uniqueIndex;not null"`
-    TeamName     string
     AccessToken  string    `gorm:"not null"`
     BotUserID    string
     ChannelID    string

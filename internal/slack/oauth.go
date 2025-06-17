@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"MidayBrief/db"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
 
 const (
@@ -64,6 +66,20 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	if !oauthResponse.Ok {
 		http.Error(w, "Slack error: "+oauthResponse.Error, http.StatusBadRequest)
 		return
+	}
+
+	team := db.TeamConfig {
+		TeamID: oauthResponse.Team.ID,
+		AccessToken: oauthResponse.AccessToken,
+		BotUserID: oauthResponse.BotUserID,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	if err := db.SaveTeamConfig(team); err != nil {
+		log.Println("Failed to save team config:", err)
+	} else {
+		log.Println("Team config saved for:", team.TeamID)
 	}
 
 	fmt.Printf("OAuth successful for team %s (%s). Bot token: %s\n", oauthResponse.Team.Name, oauthResponse.Team.ID, oauthResponse.AccessToken)

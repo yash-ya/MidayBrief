@@ -36,7 +36,7 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(event.Event.Text, "config <#") {
 			handleChannelConfig(event);
 		} else {
-			fmt.Printf("📩 New DM from user %s: %s\n", event.Event.User, event.Event.Text)
+			fmt.Printf("New DM from user %s: %s\n", event.Event.User, event.Event.Text)
 			postToStandUpsChannel(event.Event.User, event.Event.Text)
 		}
 	}
@@ -48,11 +48,11 @@ func handleChannelConfig(event SlackEvent) {
 	re := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
 	matches := re.FindStringSubmatch(event.Event.Text)
 	if len(matches) < 2 {
-		sendDM(event.Event.Channel, "⚠️ Couldn't find a valid channel reference. Try: `config #standups` (use autocomplete).")
+		sendDM(event.Event.Channel, "Couldn't find a valid channel reference. Try: `config #standups` (use autocomplete).")
 		return
 	}
 	channelID := matches[1]
 
 	userChannelMap[event.Event.User] = channelID
-	sendDM(event.Event.Channel, fmt.Sprintf("✅ Got it! I’ll post your updates to <#%s>", channelID))
+	sendDM(event.Event.Channel, fmt.Sprintf("Got it! I’ll post your updates to <#%s>", channelID))
 }
