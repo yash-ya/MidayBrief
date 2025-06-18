@@ -41,10 +41,10 @@ func runScheduledSummaries() {
 		if now == team.PostTime {
 			log.Printf("Triggering summary for team %s at %s (%s)", team.TeamID, now, team.Timezone)
 			go postSummaryForTeam(team, loc)
-			cleanupErr := db.CleanupMessages(team.TeamID)
-			if cleanupErr != nil {
-				log.Printf("Unable to clean the messages for team %s: %s\n", team.TeamID, cleanupErr)
-			}
+			// cleanupErr := db.CleanupMessages(team.TeamID)
+			// if cleanupErr != nil {
+			// 	log.Printf("Unable to clean the messages for team %s: %s\n", team.TeamID, cleanupErr)
+			// }
 		}
 	}
 }

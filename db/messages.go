@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -23,10 +24,12 @@ func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMess
 	now := time.Now().In(location)
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
 	endOfDay := startOfDay.Add(24 * time.Hour)
-
+	log.Printf("Start Of Day - %s", startOfDay)
+	log.Printf("End Of Day - %s", endOfDay)
 	startUTC := startOfDay.UTC()
 	endUTC := endOfDay.UTC()
-
+	log.Printf("Start Of Day UTC - %s", startUTC)
+	log.Printf("End Of Day UTC - %s", endUTC)
 	var messages []UserMessage
 	err := DB.Where("team_id = ? AND timestamp >= ? AND timestamp < ?", teamID, startUTC, endUTC).
 		Find(&messages).Error
