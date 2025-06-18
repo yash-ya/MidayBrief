@@ -40,7 +40,7 @@ func runScheduledSummaries() {
 		now := time.Now().In(loc).Format("15:04")
 		if now == team.PostTime {
 			log.Printf("Triggering summary for team %s at %s (%s)", team.TeamID, now, team.Timezone)
-			go postSummaryForTeam(team)
+			go postSummaryForTeam(team, loc)
 			cleanupErr := db.CleanupMessages(team.TeamID)
 			if cleanupErr != nil {
 				log.Printf("Unable to clean the messages for team %s: %s\n", team.TeamID, cleanupErr)
@@ -49,13 +49,13 @@ func runScheduledSummaries() {
 	}
 }
 
-func postSummaryForTeam(team db.TeamConfig) {
+func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 	if team.AccessToken == "" || team.ChannelID == "" {
 		log.Printf("PostSummaryForTeam: missing credentials for team %s", team.TeamID)
 		return
 	}
 
-	messages, err := db.GetMessagesForTeamToday(team.TeamID)
+	messages, err := db.GetMessagesForTeamToday(team.TeamID, location)
 	if err != nil {
 		log.Printf("PostSummaryForTeam: error fetching messages for team %s: %v", team.TeamID, err)
 		return

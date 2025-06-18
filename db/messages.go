@@ -2,12 +2,10 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
 func SaveUserMessage(teamID, userID, text string) error {
-	log.Printf("Message saved : %s", text)
 	message := UserMessage{
 		TeamID:    teamID,
 		UserID:    userID,
@@ -21,12 +19,16 @@ func SaveUserMessage(teamID, userID, text string) error {
 	return nil
 }
 
-func GetMessagesForTeamToday(teamID string) ([]UserMessage, error) {
-	today := time.Now().UTC().Truncate(24 * time.Hour)
-	tomorrow := today.Add(24 * time.Hour)
+func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMessage, error) {
+	now := time.Now().In(location)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	startUTC := startOfDay.UTC()
+	endUTC := endOfDay.UTC()
 
 	var messages []UserMessage
-	err := DB.Where("team_id = ? AND timestamp >= ? AND timestamp < ?", teamID, today, tomorrow).
+	err := DB.Where("team_id = ? AND timestamp >= ? AND timestamp < ?", teamID, startUTC, endUTC).
 		Find(&messages).Error
 
 	if err != nil {
