@@ -54,7 +54,9 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(text, "config") || strings.Contains(text, "post time") || strings.Contains(text, "timezone") {
 		handleCombinedConfig(event)
 	} else {
+		start := time.Now()
 		encryptedMessage, _ := utils.Encrypt(event.Event.Text)
+		log.Println("Encryption took:", time.Since(start))
 		if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
 			log.Printf("Failed to save user message: %v", err)
 		} else {
