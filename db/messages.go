@@ -2,10 +2,12 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
 func SaveUserMessage(teamID, userID, text string) error {
+	log.Printf("Message saved : %s", text)
 	message := UserMessage{
 		TeamID:    teamID,
 		UserID:    userID,

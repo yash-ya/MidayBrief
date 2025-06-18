@@ -76,10 +76,6 @@ func handleCombinedConfig(event SlackEvent) {
 	timeMatch := reTime.FindStringSubmatch(text)
 	zoneMatch := reZone.FindStringSubmatch(text)
 
-	log.Println("Matched post time:", timeMatch)
-	log.Println("Matched channel:", channelMatch)
-	log.Println("Matched timezone:", zoneMatch)
-
 	var updates []string
 
 	if len(channelMatch) == 2 {
