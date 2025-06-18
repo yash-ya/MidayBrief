@@ -7,12 +7,13 @@ import (
 
 	"MidayBrief/db"
 	"MidayBrief/scheduler"
+	"MidayBrief/utils"
 )
 
 func main() {
 	db.Init()
+	utils.InitCrypto()
 	go scheduler.StartScheduler()
-
 	router := SetupRouter()
 
 	port := os.Getenv("PORT")

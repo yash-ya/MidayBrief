@@ -2,6 +2,7 @@ package api
 
 import (
 	"MidayBrief/db"
+	"MidayBrief/utils"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -48,8 +49,8 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(text, "config") || strings.Contains(text, "post time") || strings.Contains(text, "timezone") {
 		handleCombinedConfig(event)
 	} else {
-		log.Printf("New DM from user %s: %s", event.Event.User, event.Event.Text)
-		if err := db.SaveUserMessage(event.TeamID, event.Event.User, event.Event.Text); err != nil {
+		encryptedMessage, _ := utils.Encrypt(event.Event.Text)
+		if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
 			log.Printf("Failed to save user message: %v", err)
 		} else {
 			log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)

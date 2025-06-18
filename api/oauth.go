@@ -2,6 +2,7 @@ package api
 
 import (
 	"MidayBrief/db"
+	"MidayBrief/utils"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,9 +78,15 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	encryptedToken, err := utils.Encrypt(oauthResp.AccessToken)
+	if err != nil {
+		log.Printf("Access token encryption failed: %s", err)
+		encryptedToken = oauthResp.AccessToken
+	}
+
 	team := db.TeamConfig{
 		TeamID:      oauthResp.Team.ID,
-		AccessToken: oauthResp.AccessToken,
+		AccessToken: encryptedToken,
 		BotUserID:   oauthResp.BotUserID,
 	}
 

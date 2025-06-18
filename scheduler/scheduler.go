@@ -3,6 +3,7 @@ package scheduler
 import (
 	"MidayBrief/api"
 	"MidayBrief/db"
+	"MidayBrief/utils"
 	"fmt"
 	"log"
 	"strings"
@@ -66,8 +67,8 @@ func postSummaryForTeam(team db.TeamConfig) {
 	}
 
 	summary := formatSummary(messages)
-
-	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
+	accessToken, _ := utils.Decrypt(team.AccessToken)
+	if err := api.SendMessage(accessToken, team.ChannelID, summary); err != nil {
 		log.Printf("PostSummaryForTeam: failed to post summary to Slack for team %s: %v", team.TeamID, err)
 	}
 }
@@ -76,7 +77,8 @@ func formatSummary(messages []db.UserMessage) string {
 	userMap := make(map[string][]string)
 
 	for _, msg := range messages {
-		userMap[msg.UserID] = append(userMap[msg.UserID], msg.Message)
+		plainMessage, _ := utils.Decrypt(msg.Message)
+		userMap[msg.UserID] = append(userMap[msg.UserID], plainMessage)
 	}
 
 	var summary strings.Builder
