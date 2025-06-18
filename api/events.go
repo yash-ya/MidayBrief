@@ -34,6 +34,11 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if event.Event.Text == "" {
+		http.Error(w, "Empty text message", http.StatusBadRequest)
+		return
+	}
+
 	team, err := db.GetTeamConfig(event.TeamID)
 	if err != nil {
 		http.Error(w, "Team not configured", http.StatusBadRequest)
@@ -61,7 +66,7 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCombinedConfig(event SlackEvent) {
-	text := event.Event.Text
+	text := strings.ToLower(event.Event.Text)
 
 	reChan := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
 	reTime := regexp.MustCompile(`post time (\d{2}:\d{2})`)
@@ -70,6 +75,10 @@ func handleCombinedConfig(event SlackEvent) {
 	channelMatch := reChan.FindStringSubmatch(text)
 	timeMatch := reTime.FindStringSubmatch(text)
 	zoneMatch := reZone.FindStringSubmatch(text)
+
+	log.Println("Matched post time:", timeMatch)
+	log.Println("Matched channel:", channelMatch)
+	log.Println("Matched timezone:", zoneMatch)
 
 	var updates []string
 
