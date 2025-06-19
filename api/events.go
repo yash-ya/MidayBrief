@@ -218,6 +218,7 @@ func extractUserIDs(text, pattern string) []string {
 	var users []string
 	for _, m := range matches {
 		if len(m) >= 2 {
+			log.Println(m[1])
 			users = append(users, m[1])
 		}
 	}
