@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 )
@@ -70,6 +71,9 @@ func getTeamTimeZone(accessToken string) (string, error) {
 			} `json:"prefs"`
 		} `json:"team"`
 	}
+
+	body, _ := io.ReadAll(resp.Body)
+	log.Printf("oauth response - %s", string(body))
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
