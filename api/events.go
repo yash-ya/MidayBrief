@@ -73,7 +73,6 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
-
 	if event.Event.User != team.AdminUserID {
 		sendDM(team.TeamID, event.Event.Channel, "Only the admin can update team settings.")
 		return
@@ -85,51 +84,64 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	reTime := regexp.MustCompile(`post time (\d{2}:\d{2})`)
 	reZone := regexp.MustCompile(`timezone ([A-Za-z]+/[A-Za-z_]+)`)
 
-	channelMatch := reChan.FindStringSubmatch(text)
+	channelMatch := reChan.FindStringSubmatch(event.Event.Text) // case-sensitive for display
 	timeMatch := reTime.FindStringSubmatch(text)
 	zoneMatch := reZone.FindStringSubmatch(text)
 
-	log.Printf("Channel Match %s", channelMatch)
-	log.Printf("time Match %s", timeMatch)
-	log.Printf("zone Match %s", zoneMatch)
-
 	var updates []string
+	var errors []string
 
+	// Channel
 	if len(channelMatch) == 2 {
 		if err := db.UpdateChannelID(event.TeamID, channelMatch[1]); err == nil {
 			updates = append(updates, "channel")
 		} else {
-			log.Printf("Failed to update channel for team %s: %v", event.TeamID, err)
+			errors = append(errors, "Failed to update channel.")
 		}
 	}
 
+	// Post Time
 	if len(timeMatch) == 2 {
 		if _, err := time.Parse("15:04", timeMatch[1]); err == nil {
 			if err := db.UpdatePostTime(event.TeamID, timeMatch[1]); err == nil {
 				updates = append(updates, "post time")
 			} else {
-				log.Printf("Failed to update post time for team %s: %v", event.TeamID, err)
+				errors = append(errors, "Failed to update post time.")
 			}
+		} else {
+			errors = append(errors, "Invalid time format. Use 24-hr format like: post time 17:00.")
 		}
 	}
 
+	// Timezone
 	if len(zoneMatch) == 2 {
 		if _, err := time.LoadLocation(zoneMatch[1]); err == nil {
 			if err := db.UpdateTimezone(event.TeamID, zoneMatch[1]); err == nil {
 				updates = append(updates, "timezone")
 			} else {
-				log.Printf("Failed to update timezone for team %s: %v", event.TeamID, err)
+				errors = append(errors, "Failed to update timezone.")
 			}
+		} else {
+			errors = append(errors, fmt.Sprintf("Invalid timezone: '%s'. Use format like: timezone Asia/Kolkata.", zoneMatch[1]))
 		}
 	}
 
 	if len(updates) > 0 {
 		msg := fmt.Sprintf("Updated: %s", strings.Join(updates, ", "))
+		if len(errors) > 0 {
+			msg += "\n\n" + strings.Join(errors, "\n")
+		}
 		sendDM(event.TeamID, event.Event.Channel, msg)
-	} else {
-		sendDM(event.TeamID, event.Event.Channel,
-			"No valid configuration found. Try: `config #channel`, `post time 17:00`, or `timezone Asia/Kolkata`.")
+		return
 	}
+
+	if len(errors) > 0 {
+		sendDM(event.TeamID, event.Event.Channel, strings.Join(errors, "\n"))
+		return
+	}
+
+	sendDM(event.TeamID, event.Event.Channel,
+		"No valid configuration found. Try: config #channel, post time 17:00, or timezone Asia/Kolkata.")
 }
 
 type SlackMessage struct {
