@@ -85,7 +85,7 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		encryptedToken = oauthResp.AccessToken
 	}
 
-	timezone, err := getTeamTimeZone(oauthResp.AccessToken)
+	timezone, err := getUserTimeZone(oauthResp.AccessToken, oauthResp.AuthedUser.ID)
 	if err != nil {
 		log.Println("Could not fetch team timezone:", err)
 		timezone = "UTC"
@@ -104,8 +104,8 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to save team configuration", http.StatusInternalServerError)
 		return
 	}
-
-	sendDM(oauthResp.Team.ID, oauthResp.AuthedUser.ID, slackWelcomeMessage)
+	welcomeMsg := fmt.Sprintf(slackWelcomeMessage, timezone)
+	sendDM(oauthResp.Team.ID, oauthResp.AuthedUser.ID, welcomeMsg)
 
 	log.Printf("OAuth successful for team %s (%s)", oauthResp.Team.Name, oauthResp.Team.ID)
 	w.WriteHeader(http.StatusOK)
