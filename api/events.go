@@ -100,7 +100,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 
 	if channelID := extractChannelID(text); channelID != "" {
 		if err := db.UpdateChannelID(team.TeamID, channelID); err == nil {
-			updates = append(updates, "channel")
+			updates = append(updates, fmt.Sprintf("channel updated to %s", channelID))
 		} else {
 			errors = append(errors, "Failed to update channel.")
 		}
@@ -109,7 +109,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if timeStr := extractValue(text, `post time (\d{2}:\d{2})`); timeStr != "" {
 		if _, err := time.Parse("15:04", timeStr); err == nil {
 			if err := db.UpdatePostTime(team.TeamID, timeStr); err == nil {
-				updates = append(updates, "post time")
+				updates = append(updates, fmt.Sprintf("post time updated to %s", timeStr))
 			} else {
 				errors = append(errors, "Failed to update post time.")
 			}
@@ -121,7 +121,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if zone := extractValue(text, `timezone ([A-Za-z]+/[A-Za-z_]+)`); zone != "" {
 		if _, err := time.LoadLocation(zone); err == nil {
 			if err := db.UpdateTimezone(team.TeamID, zone); err == nil {
-				updates = append(updates, "timezone")
+				updates = append(updates, fmt.Sprintf("timezone updated to %s", zone))
 			} else {
 				errors = append(errors, "Failed to update timezone.")
 			}
@@ -133,7 +133,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if promptTime := extractValue(text, `prompt time (\d{2}:\d{2})`); promptTime != "" {
 		if _, err := time.Parse("15:04", promptTime); err == nil {
 			if err := db.UpdatePromptTime(team.TeamID, promptTime); err == nil {
-				updates = append(updates, "prompt time")
+				updates = append(updates, fmt.Sprintf("prompt time updated to %s", promptTime))
 			} else {
 				errors = append(errors, "Failed to update prompt time.")
 			}
