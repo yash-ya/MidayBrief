@@ -1,10 +1,14 @@
 package db
 
-import "gorm.io/gorm/clause"
+import (
+	"time"
+
+	"gorm.io/gorm/clause"
+)
 
 func AddPromptUser(teamID, userID string) error {
 	return DB.Clauses(clause.OnConflict{DoNothing: true}).
-		Create(&PromptUser{TeamID: teamID, UserID: userID, IsActive: true}).Error
+		Create(&PromptUser{TeamID: teamID, UserID: userID, IsActive: true, CreatedAt: time.Now().UTC()}).Error
 }
 
 func RemovePromptUser(teamID, userID string) error {
