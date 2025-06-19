@@ -24,3 +24,11 @@ type UserMessage struct {
 	MessageHash string `gorm:"not null"`
 	Timestamp   time.Time
 }
+
+type PromptUser struct {
+	ID        uint   `gorm:"primaryKey"`
+	TeamID    string `gorm:"not null"`
+	UserID    string `gorm:"not null"`
+	IsActive  bool   `gorm:"not null"`
+	CreatedAt time.Time
+}

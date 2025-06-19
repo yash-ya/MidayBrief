@@ -80,6 +80,46 @@ func getUserTimeZone(accessToken, userID string) (string, error) {
 	return result.User.TZ, nil
 }
 
+func getAllTeamUsers(token string) ([]string, error) {
+	req, err := http.NewRequest("GET", slackUsersListURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request failed: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to Slack failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		OK      bool `json:"ok"`
+		Members []struct {
+			ID       string `json:"id"`
+			IsBot    bool   `json:"is_bot"`
+			Deleted  bool   `json:"deleted"`
+			RealName string `json:"real_name"`
+		} `json:"members"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response failed: %w", err)
+	}
+	if !result.OK {
+		return nil, fmt.Errorf("Slack API returned not OK")
+	}
+
+	var userIDs []string
+	for _, member := range result.Members {
+		if !member.IsBot && !member.Deleted {
+			userIDs = append(userIDs, member.ID)
+		}
+	}
+	return userIDs, nil
+}
+
 // func postToStandUpsChannel(teamID, userID, message string) {
 // 	team, err := db.GetTeamConfig(teamID)
 // 	if err != nil {

@@ -41,3 +41,7 @@ type SlackEventData struct {
 	Channel     string `json:"channel"`
 	ChannelType string `json:"channel_type"`
 }
+
+type Commands struct {
+	Operation []string
+}

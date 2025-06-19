@@ -21,6 +21,7 @@ func Init() {
 	if err != nil {
 		log.Fatalf("Failed to connect to the database: %v", err)
 	}
-
 	log.Println("Database connection established")
+
+	DB.AutoMigrate(&TeamConfig{}, &UserMessage{}, &PromptUser{})
 }

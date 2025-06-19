@@ -74,6 +74,21 @@ func UpdatePostTime(teamID, postTime string) error {
 	return nil
 }
 
+func UpdatePromptTime(teamID, postTime string) error {
+	now := time.Now().UTC()
+	err := DB.Model(&TeamConfig{}).
+		Where("team_id = ?", teamID).
+		Updates(map[string]any{
+			"prompt_time": postTime,
+			"updated_at":  now,
+		}).Error
+
+	if err != nil {
+		return fmt.Errorf("UpdatePromptTime: failed for team %s: %w", teamID, err)
+	}
+	return nil
+}
+
 func UpdateTimezone(teamID, timezone string) error {
 	now := time.Now().UTC()
 	err := DB.Model(&TeamConfig{}).

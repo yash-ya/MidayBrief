@@ -50,26 +50,43 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	text := strings.ToLower(event.Event.Text)
-	if strings.HasPrefix(text, "config <#") || strings.HasPrefix(text, "post time") || strings.HasPrefix(text, "timezone") {
+	text := event.Event.Text
+	if isConfig(text) {
 		handleCombinedConfig(event, team)
 	} else {
-		hash := utils.Hash(event.Event.Text)
-		if db.IsDuplicateMessage(event.TeamID, event.Event.User, hash, team.Timezone) {
-			sendDM(event.TeamID, event.Event.Channel, "Looks like you've already sent this update today.")
-			return
-		}
-
-		encryptedMessage, _ := utils.Encrypt(event.Event.Text)
-		if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
-			log.Printf("Failed to save user message: %v", err)
-		} else {
-			log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)
-			sendDM(event.TeamID, event.Event.Channel, "Got your update for today!")
-		}
+		handleUserMessage(event, team)
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func isConfig(text string) bool {
+	lowered := strings.ToLower(text)
+	isConfig := regexp.MustCompile(`^config\s+<#(C\w+)\|?[^>]*>`).MatchString(lowered)
+	isPostTime := regexp.MustCompile(`^post time\s+\d{2}:\d{2}`).MatchString(lowered)
+	isTimezone := regexp.MustCompile(`^timezone\s+[A-Za-z]+/[A-Za-z_]+`).MatchString(lowered)
+	isPromptTime := regexp.MustCompile(`^prompt time\s+\d{2}:\d{2}`).MatchString(lowered)
+	isAddAll := strings.TrimSpace(lowered) == "add all"
+	isAddUser := regexp.MustCompile(`^add\s+(<@([UW][A-Z0-9]+)>)+`).MatchString(lowered)
+	isRemoveUser := regexp.MustCompile(`^remove\s+(<@([UW][A-Z0-9]+)>)+`).MatchString(lowered)
+
+	return isConfig || isPostTime || isTimezone || isPromptTime || isAddAll || isAddUser || isRemoveUser
+}
+
+func handleUserMessage(event SlackEvent, team *db.TeamConfig) {
+	hash := utils.Hash(event.Event.Text)
+	if db.IsDuplicateMessage(event.TeamID, event.Event.User, hash, team.Timezone) {
+		sendDM(event.TeamID, event.Event.Channel, "Looks like you've already sent this update today.")
+		return
+	}
+
+	encryptedMessage, _ := utils.Encrypt(event.Event.Text)
+	if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
+		log.Printf("Failed to save user message: %v", err)
+	} else {
+		log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)
+		sendDM(event.TeamID, event.Event.Channel, "Got your update for today!")
+	}
 }
 
 func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
@@ -78,30 +95,20 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		return
 	}
 
-	reChan := regexp.MustCompile(`config <#(C\w+)\|?[^>]*>`)
-	reTime := regexp.MustCompile(`post time (\d{2}:\d{2})`)
-	reZone := regexp.MustCompile(`timezone ([A-Za-z]+/[A-Za-z_]+)`)
+	text := event.Event.Text
+	var updates, errors []string
 
-	channelMatch := reChan.FindStringSubmatch(event.Event.Text)
-	timeMatch := reTime.FindStringSubmatch(event.Event.Text)
-	zoneMatch := reZone.FindStringSubmatch(event.Event.Text)
-
-	var updates []string
-	var errors []string
-
-	// Channel
-	if len(channelMatch) == 2 {
-		if err := db.UpdateChannelID(event.TeamID, channelMatch[1]); err == nil {
+	if channelID := extractChannelID(text); channelID != "" {
+		if err := db.UpdateChannelID(team.TeamID, channelID); err == nil {
 			updates = append(updates, "channel")
 		} else {
 			errors = append(errors, "Failed to update channel.")
 		}
 	}
 
-	// Post Time
-	if len(timeMatch) == 2 {
-		if _, err := time.Parse("15:04", timeMatch[1]); err == nil {
-			if err := db.UpdatePostTime(event.TeamID, timeMatch[1]); err == nil {
+	if timeStr := extractValue(text, `post time (\d{2}:\d{2})`); timeStr != "" {
+		if _, err := time.Parse("15:04", timeStr); err == nil {
+			if err := db.UpdatePostTime(team.TeamID, timeStr); err == nil {
 				updates = append(updates, "post time")
 			} else {
 				errors = append(errors, "Failed to update post time.")
@@ -111,35 +118,109 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	// Timezone
-	if len(zoneMatch) == 2 {
-		if _, err := time.LoadLocation(zoneMatch[1]); err == nil {
-			if err := db.UpdateTimezone(event.TeamID, zoneMatch[1]); err == nil {
+	if zone := extractValue(text, `timezone ([A-Za-z]+/[A-Za-z_]+)`); zone != "" {
+		if _, err := time.LoadLocation(zone); err == nil {
+			if err := db.UpdateTimezone(team.TeamID, zone); err == nil {
 				updates = append(updates, "timezone")
 			} else {
 				errors = append(errors, "Failed to update timezone.")
 			}
 		} else {
-			errors = append(errors, fmt.Sprintf("Invalid timezone: '%s'. Use format like: timezone Asia/Kolkata.", zoneMatch[1]))
+			errors = append(errors, fmt.Sprintf("Invalid timezone: '%s'. Use format like: timezone Asia/Kolkata.", zone))
 		}
 	}
 
+	if promptTime := extractValue(text, `prompt time (\d{2}:\d{2})`); promptTime != "" {
+		if _, err := time.Parse("15:04", promptTime); err == nil {
+			if err := db.UpdatePromptTime(team.TeamID, promptTime); err == nil {
+				updates = append(updates, "prompt time")
+			} else {
+				errors = append(errors, "Failed to update prompt time.")
+			}
+		} else {
+			errors = append(errors, "Invalid time format. Use 24-hr format like: prompt time 10:00.")
+		}
+	}
+
+	if strings.TrimSpace(strings.ToLower(text)) == "add all" {
+		users, err := getAllTeamUsers(team.AccessToken)
+		if err != nil {
+			errors = append(errors, "Failed to fetch user list for adding.")
+		} else {
+			count := 0
+			for _, userID := range users {
+				if err := db.AddPromptUser(team.TeamID, userID); err == nil {
+					count++
+				}
+			}
+			updates = append(updates, fmt.Sprintf("added %d users for prompts", count))
+		}
+	}
+
+	for _, userID := range extractUserIDs(text, `add\s+<@([UW][A-Z0-9]+)>`) {
+		if err := db.AddPromptUser(team.TeamID, userID); err == nil {
+			updates = append(updates, fmt.Sprintf("added @%s", userID))
+		} else {
+			errors = append(errors, fmt.Sprintf("Failed to add @%s", userID))
+		}
+	}
+
+	for _, userID := range extractUserIDs(text, `remove\s+<@([UW][A-Z0-9]+)>`) {
+		if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
+			updates = append(updates, fmt.Sprintf("removed @%s", userID))
+		} else {
+			errors = append(errors, fmt.Sprintf("Failed to remove @%s", userID))
+		}
+	}
+
+	var response strings.Builder
 	if len(updates) > 0 {
-		msg := fmt.Sprintf("Updated: %s", strings.Join(updates, ", "))
-		if len(errors) > 0 {
-			msg += "\n\n" + strings.Join(errors, "\n")
+		response.WriteString("✅ Updates:\n")
+		for _, u := range updates {
+			response.WriteString("- " + u + "\n")
 		}
-		sendDM(event.TeamID, event.Event.Channel, msg)
-		return
 	}
-
 	if len(errors) > 0 {
-		sendDM(event.TeamID, event.Event.Channel, strings.Join(errors, "\n"))
-		return
+		response.WriteString("\n⚠️ Issues:\n")
+		for _, e := range errors {
+			response.WriteString("- " + e + "\n")
+		}
+	}
+	if response.Len() == 0 {
+		response.WriteString("No valid configuration found.\nTry: `config #channel`, `post time 17:00`, `timezone Asia/Kolkata`, `add all`, `add/remove @user`.")
 	}
 
-	sendDM(event.TeamID, event.Event.Channel,
-		"No valid configuration found. Try: config #channel, post time 17:00, or timezone Asia/Kolkata.")
+	sendDM(team.TeamID, event.Event.Channel, response.String())
+}
+
+func extractChannelID(text string) string {
+	re := regexp.MustCompile(`config\s+<#(C\w+)\|?[^>]*>`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+	return ""
+}
+
+func extractValue(text, pattern string) string {
+	re := regexp.MustCompile(pattern)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+	return ""
+}
+
+func extractUserIDs(text, pattern string) []string {
+	re := regexp.MustCompile(pattern)
+	matches := re.FindAllStringSubmatch(text, -1)
+	var users []string
+	for _, m := range matches {
+		if len(m) >= 2 {
+			users = append(users, m[1])
+		}
+	}
+	return users
 }
 
 type SlackMessage struct {
