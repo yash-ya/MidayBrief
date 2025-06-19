@@ -89,6 +89,10 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	timeMatch := reTime.FindStringSubmatch(text)
 	zoneMatch := reZone.FindStringSubmatch(text)
 
+	log.Printf("Channel Match %s", channelMatch)
+	log.Printf("time Match %s", timeMatch)
+	log.Printf("zone Match %s", zoneMatch)
+
 	var updates []string
 
 	if len(channelMatch) == 2 {
