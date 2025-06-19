@@ -78,15 +78,13 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		return
 	}
 
-	text := strings.ToLower(event.Event.Text)
-
-	reChan := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)
+	reChan := regexp.MustCompile(`config <#(C\w+)\|?[^>]*>`)
 	reTime := regexp.MustCompile(`post time (\d{2}:\d{2})`)
 	reZone := regexp.MustCompile(`timezone ([A-Za-z]+/[A-Za-z_]+)`)
 
-	channelMatch := reChan.FindStringSubmatch(event.Event.Text) // case-sensitive for display
-	timeMatch := reTime.FindStringSubmatch(text)
-	zoneMatch := reZone.FindStringSubmatch(text)
+	channelMatch := reChan.FindStringSubmatch(event.Event.Text)
+	timeMatch := reTime.FindStringSubmatch(event.Event.Text)
+	zoneMatch := reZone.FindStringSubmatch(event.Event.Text)
 
 	var updates []string
 	var errors []string
