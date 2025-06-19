@@ -68,8 +68,8 @@ func isConfig(text string) bool {
 	isTimezone := regexp.MustCompile(`^timezone\s+[A-Za-z]+/[A-Za-z_]+`).MatchString(lowered)
 	isPromptTime := regexp.MustCompile(`^prompt time\s+\d{2}:\d{2}`).MatchString(lowered)
 	isAddAll := strings.TrimSpace(lowered) == "add all"
-	isAddUser := regexp.MustCompile(`^add\s+(<@([UW][A-Z0-9]+)>)+`).MatchString(lowered)
-	isRemoveUser := regexp.MustCompile(`^remove\s+(<@([UW][A-Z0-9]+)>)+`).MatchString(lowered)
+	isAddUser := strings.HasPrefix(lowered, "add ") && regexp.MustCompile(`<@([UW][A-Z0-9]+)>`).MatchString(lowered)
+	isRemoveUser := strings.HasPrefix(lowered, "remove ") && regexp.MustCompile(`<@([UW][A-Z0-9]+)>`).MatchString(lowered)
 
 	return isConfig || isPostTime || isTimezone || isPromptTime || isAddAll || isAddUser || isRemoveUser
 }
@@ -158,7 +158,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	for _, userID := range extractUserIDs(text, `add\s+<@([UW][A-Z0-9]+)>`) {
+	for _, userID := range extractUserIDs(text, `<@([UW][A-Z0-9]+)>`) {
 		if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 			updates = append(updates, fmt.Sprintf("added @%s", userID))
 		} else {
@@ -166,7 +166,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	for _, userID := range extractUserIDs(text, `remove\s+<@([UW][A-Z0-9]+)>`) {
+	for _, userID := range extractUserIDs(text, `<@([UW][A-Z0-9]+)>`) {
 		if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
 			updates = append(updates, fmt.Sprintf("removed @%s", userID))
 		} else {
