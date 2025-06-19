@@ -5,6 +5,7 @@ import (
 	"MidayBrief/utils"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -46,6 +47,39 @@ func sendDM(teamID, userChannelID, message string) {
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("sendDM: Slack API responded with status %s", resp.Status)
 	}
+}
+
+func getTeamTimeZone(accessToken string) (string, error) {
+	req, err := http.NewRequest("GET", slackTeamInfoURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		OK   bool `json:"ok"`
+		Team struct {
+			Prefs struct {
+				Timezone string `json:"timezone"`
+			} `json:"prefs"`
+		} `json:"team"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if !result.OK {
+		return "", fmt.Errorf("slack api error: could not get timezone")
+	}
+
+	return result.Team.Prefs.Timezone, nil
 }
 
 // func postToStandUpsChannel(teamID, userID, message string) {

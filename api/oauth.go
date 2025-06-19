@@ -84,11 +84,18 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		encryptedToken = oauthResp.AccessToken
 	}
 
+	timezone, err := getTeamTimeZone(oauthResp.AccessToken)
+	if err != nil {
+		log.Println("Could not fetch team timezone:", err)
+		timezone = "UTC"
+	}
+
 	team := db.TeamConfig{
 		TeamID:      oauthResp.Team.ID,
 		AccessToken: encryptedToken,
 		BotUserID:   oauthResp.BotUserID,
 		AdminUserID: oauthResp.AuthedUser.ID,
+		Timezone:    timezone,
 	}
 
 	if err := db.SaveTeamConfig(team); err != nil {
