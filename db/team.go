@@ -20,7 +20,7 @@ func SaveTeamConfig(team TeamConfig) error {
 
 	err := DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "team_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"access_token", "bot_user_id", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"access_token", "bot_user_id", "updated_at", "admin_user_id"}),
 	}).Create(&team).Error
 
 	if err != nil {
@@ -79,7 +79,7 @@ func UpdateTimezone(teamID, timezone string) error {
 	err := DB.Model(&TeamConfig{}).
 		Where("team_id = ?", teamID).
 		Updates(map[string]any{
-			"timezone":  timezone,
+			"timezone":   timezone,
 			"updated_at": now,
 		}).Error
 

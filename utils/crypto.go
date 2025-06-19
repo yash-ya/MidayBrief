@@ -4,7 +4,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -58,7 +60,7 @@ func Decrypt(encrypted string) (string, error) {
 
 	nonceSize := aesGCM.NonceSize()
 	if len(cipherData) < nonceSize {
-		return "", errors.New("ciphertext too short")
+		return "", errors.New("cipher text too short")
 	}
 
 	nonce := cipherData[:nonceSize]
@@ -70,4 +72,9 @@ func Decrypt(encrypted string) (string, error) {
 	}
 
 	return string(plainText), nil
+}
+
+func Hash(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
 }

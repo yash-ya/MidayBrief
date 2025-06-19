@@ -1,16 +1,19 @@
 package db
 
 import (
+	"MidayBrief/utils"
 	"fmt"
+	"log"
 	"time"
 )
 
 func SaveUserMessage(teamID, userID, text string) error {
 	message := UserMessage{
-		TeamID:    teamID,
-		UserID:    userID,
-		Message:   text,
-		Timestamp: time.Now().UTC(),
+		TeamID:      teamID,
+		UserID:      userID,
+		Message:     text,
+		Timestamp:   time.Now().UTC(),
+		MessageHash: utils.Hash(text),
 	}
 
 	if err := DB.Create(&message).Error; err != nil {
@@ -37,4 +40,22 @@ func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMess
 
 func CleanupMessages(teamID string) error {
 	return DB.Where("team_id = ?", teamID).Delete(&UserMessage{}).Error
+}
+
+func IsDuplicateMessage(teamID, userID, hash, timezone string) bool {
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		log.Printf("Invalid timezone for duplicate check: %s. Defaulting to UTC", timezone)
+		location = time.UTC
+	}
+
+	startOfDay := time.Now().In(location).Truncate(24 * time.Hour)
+	startOfDayUTC := startOfDay.UTC()
+
+	var count int64
+	DB.Model(&UserMessage{}).
+		Where("team_id = ? AND user_id = ? AND hash = ? AND timestamp >= ?", teamID, userID, hash, startOfDayUTC).
+		Count(&count)
+
+	return count > 0
 }

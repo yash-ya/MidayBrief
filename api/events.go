@@ -51,23 +51,34 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	text := strings.ToLower(event.Event.Text)
-	if strings.Contains(text, "config") || strings.Contains(text, "post time") || strings.Contains(text, "timezone") {
-		handleCombinedConfig(event)
+	if strings.HasPrefix(text, "config <#") || strings.HasPrefix(text, "post time") || strings.HasPrefix(text, "timezone") {
+		handleCombinedConfig(event, team)
 	} else {
-		start := time.Now()
+		hash := utils.Hash(event.Event.Text)
+		if db.IsDuplicateMessage(event.TeamID, event.Event.User, hash, team.Timezone) {
+			sendDM(event.TeamID, event.Event.Channel, "Looks like you've already sent this update today.")
+			return
+		}
+
 		encryptedMessage, _ := utils.Encrypt(event.Event.Text)
-		log.Println("Encryption took:", time.Since(start))
 		if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
 			log.Printf("Failed to save user message: %v", err)
 		} else {
 			log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)
+			sendDM(event.TeamID, event.Event.Channel, "Got your update for today!")
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleCombinedConfig(event SlackEvent) {
+func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
+
+	if event.Event.User != team.AdminUserID {
+		sendDM(team.TeamID, event.Event.Channel, "Only the admin can update team settings.")
+		return
+	}
+
 	text := strings.ToLower(event.Event.Text)
 
 	reChan := regexp.MustCompile(`<#(C\w+)\|?[^>]*>`)

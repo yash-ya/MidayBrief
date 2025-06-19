@@ -88,6 +88,7 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		TeamID:      oauthResp.Team.ID,
 		AccessToken: encryptedToken,
 		BotUserID:   oauthResp.BotUserID,
+		AdminUserID: oauthResp.AuthedUser.ID,
 	}
 
 	if err := db.SaveTeamConfig(team); err != nil {
