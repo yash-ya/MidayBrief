@@ -51,6 +51,7 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	text := event.Event.Text
+	log.Printf("User message %s", text)
 	if isConfig(text) {
 		handleCombinedConfig(event, team)
 	} else {
