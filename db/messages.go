@@ -54,7 +54,7 @@ func IsDuplicateMessage(teamID, userID, hash, timezone string) bool {
 
 	var count int64
 	DB.Model(&UserMessage{}).
-		Where("team_id = ? AND user_id = ? AND hash = ? AND timestamp >= ?", teamID, userID, hash, startOfDayUTC).
+		Where("team_id = ? AND user_id = ? AND message_hash = ? AND timestamp >= ?", teamID, userID, hash, startOfDayUTC).
 		Count(&count)
 
 	return count > 0
