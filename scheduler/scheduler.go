@@ -19,14 +19,12 @@ func StartScheduler() {
 
 	log.Println("Scheduler started...")
 
-	for t := range ticker.C {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		processSchedule(ctx, t)
-		cancel()
+	for now := range ticker.C {
+		processSchedule(now)
 	}
 }
 
-func processSchedule(ctx context.Context, now time.Time) {
+func processSchedule(now time.Time) {
 	teams, err := db.GetAllTeamConfigs()
 	if err != nil {
 		log.Println("Failed to fetch team configs:", err)
@@ -48,7 +46,7 @@ func processSchedule(ctx context.Context, now time.Time) {
 
 		if localTime == team.PromptTime {
 			log.Printf("Triggering prompt for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
-			go triggerPromptForTeam(team, ctx)
+			go triggerPromptForTeam(team)
 		}
 
 		if localTime == team.PostTime {
@@ -61,7 +59,10 @@ func processSchedule(ctx context.Context, now time.Time) {
 	}
 }
 
-func triggerPromptForTeam(team db.TeamConfig, ctx context.Context) {
+func triggerPromptForTeam(team db.TeamConfig) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	users, err := db.GetAllPromptUser(team.TeamID)
 	if err != nil {
 		log.Printf("Failed to get prompt users for %s: %v", team.TeamID, err)
