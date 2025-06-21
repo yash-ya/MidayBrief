@@ -80,7 +80,12 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		err := api.SendMessage(team.AccessToken, user.UserID, promptMessage)
+		accessToken, decryptErr := utils.Decrypt(team.AccessToken)
+		if decryptErr != nil {
+			log.Printf("AccessToken Decryption Error %s: %v", team.AccessToken, decryptErr)
+		}
+
+		err := api.SendMessage(accessToken, user.UserID, promptMessage)
 		if err != nil {
 			log.Printf("Failed to send first prompt to user %s: %v", user.UserID, err)
 		}

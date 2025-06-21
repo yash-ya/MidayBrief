@@ -2,9 +2,7 @@ package db
 
 import (
 	"MidayBrief/utils"
-	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -35,13 +33,6 @@ func SaveTeamConfig(team TeamConfig) error {
 func GetAllTeamConfigs() ([]TeamConfig, error) {
 	var teams []TeamConfig
 	err := DB.Find(&teams).Error
-	if len(teams) > 0 {
-		for _, team := range teams {
-			team.AccessToken, _ = utils.Decrypt(team.AccessToken)
-		}
-	}
-	body, _ := json.Marshal(teams)
-	log.Printf("Teams Details - %s", body)
 	return teams, err
 }
 
