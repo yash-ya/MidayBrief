@@ -16,6 +16,7 @@ const promptMessage = "Good day! 👋\n\nHope you're doing well. Let's kick off 
 func StartScheduler() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
+
 	log.Println("Scheduler started...")
 
 	for t := range ticker.C {
