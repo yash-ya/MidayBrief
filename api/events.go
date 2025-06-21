@@ -67,7 +67,7 @@ func isConfig(text string) bool {
 	isPostTime := regexp.MustCompile(`post time\s+\d{2}:\d{2}`).MatchString(lowered)
 	isTimezone := regexp.MustCompile(`timezone\s+[A-Za-z]+/[A-Za-z_]+`).MatchString(text)
 	isPromptTime := regexp.MustCompile(`prompt time\s+\d{2}:\d{2}`).MatchString(lowered)
-	isAddAll := strings.Contains(lowered, "add all")
+	isAddAll := strings.Contains(lowered, "add all users")
 	isAddUser := regexp.MustCompile(`add user\s+(<@U[0-9A-Z]+>\s*)+`).MatchString(text)
 	isRemoveUser := regexp.MustCompile(`remove user\s+(<@U[0-9A-Z]+>\s*)+`).MatchString(text)
 
@@ -143,7 +143,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.TrimSpace(strings.ToLower(text)) == "add all" {
+	if strings.Contains(strings.TrimSpace(strings.ToLower(text)), "add all users") {
 		users, err := getAllTeamUsers(team.AccessToken)
 		if err != nil {
 			errors = append(errors, "Failed to fetch user list for adding.")
