@@ -63,13 +63,13 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 
 func isConfig(text string) bool {
 	lowered := strings.ToLower(text)
-	isConfig := regexp.MustCompile(`^config\s+<#(C\w+)\|?[^>]*>`).MatchString(lowered)
-	isPostTime := regexp.MustCompile(`^post time\s+\d{2}:\d{2}`).MatchString(lowered)
-	isTimezone := regexp.MustCompile(`^timezone\s+[A-Za-z]+/[A-Za-z_]+`).MatchString(lowered)
-	isPromptTime := regexp.MustCompile(`^prompt time\s+\d{2}:\d{2}`).MatchString(lowered)
-	isAddAll := strings.TrimSpace(lowered) == "add all"
-	isAddUser := strings.HasPrefix(lowered, "add ") && regexp.MustCompile(`^add\s+(<@U[0-9A-Z]+>\s*)+$`).MatchString(text)
-	isRemoveUser := strings.HasPrefix(lowered, "remove ") && regexp.MustCompile(`^remove\s+(<@U[0-9A-Z]+>\s*)+$`).MatchString(text)
+	isConfig := regexp.MustCompile(`config\s+<#(C\w+)\|?[^>]*>`).MatchString(text)
+	isPostTime := regexp.MustCompile(`post time\s+\d{2}:\d{2}`).MatchString(lowered)
+	isTimezone := regexp.MustCompile(`timezone\s+[A-Za-z]+/[A-Za-z_]+`).MatchString(text)
+	isPromptTime := regexp.MustCompile(`prompt time\s+\d{2}:\d{2}`).MatchString(lowered)
+	isAddAll := strings.Contains(lowered, "add all")
+	isAddUser := regexp.MustCompile(`add user\s+(<@U[0-9A-Z]+>\s*)+`).MatchString(text)
+	isRemoveUser := regexp.MustCompile(`remove user\s+(<@U[0-9A-Z]+>\s*)+`).MatchString(text)
 
 	return isConfig || isPostTime || isTimezone || isPromptTime || isAddAll || isAddUser || isRemoveUser
 }

@@ -21,5 +21,6 @@ const (
 		"4️⃣ Decide who gets prompted:\n" +
 		"• To include everyone: `add all`\n" +
 		"• To choose specific people: `add user @alice @bob`\n\n" +
+		"• To remove specific people: `remove user @alice @bob`\n\n" +
 		"🛠️ You can always tweak these settings later by sending the individual commands above."
 )
