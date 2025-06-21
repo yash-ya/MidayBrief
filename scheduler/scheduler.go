@@ -77,8 +77,7 @@ func formatSummary(messages []db.UserMessage) string {
 	userMap := make(map[string][]string)
 
 	for _, msg := range messages {
-		plainMessage, _ := utils.Decrypt(msg.Message)
-		userMap[msg.UserID] = append(userMap[msg.UserID], plainMessage)
+		userMap[msg.UserID] = append(userMap[msg.UserID], msg.Message)
 	}
 
 	var summary strings.Builder

@@ -2,7 +2,6 @@ package api
 
 import (
 	"MidayBrief/db"
-	"MidayBrief/utils"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -29,14 +28,13 @@ func sendDM(teamID, userChannelID, message string) {
 		return
 	}
 
-	accessToken, _ := utils.Decrypt(team.AccessToken)
 	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("sendDM: failed to create request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
