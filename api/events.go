@@ -158,7 +158,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "add ") {
+	if strings.HasPrefix(strings.ToLower(text), "add users ") {
 		addUsers := extractUserIDs(text)
 		for _, userID := range addUsers {
 
@@ -170,7 +170,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "remove ") {
+	if strings.HasPrefix(strings.ToLower(text), "remove users ") {
 		removeUsers := extractUserIDs(text)
 		for _, userID := range removeUsers {
 			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
