@@ -35,6 +35,9 @@ func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMess
 	if err != nil {
 		return nil, fmt.Errorf("GetMessagesForTeamToday: failed to fetch messages for team %s: %w", teamID, err)
 	}
+	for _, msg := range messages {
+		msg.Message, _ = utils.Decrypt(msg.Message)
+	}
 	return messages, nil
 }
 
