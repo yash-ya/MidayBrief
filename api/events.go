@@ -146,7 +146,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if strings.Contains(strings.TrimSpace(strings.ToLower(text)), "add all users") {
 		users, err := getAllTeamUsers(team.AccessToken)
 		if err != nil {
-			errors = append(errors, "Failed to fetch user list for adding.")
+			errors = append(errors, fmt.Sprintf("Failed to fetch user list for adding. Error - %s", err))
 		} else {
 			count := 0
 			for _, userID := range users {

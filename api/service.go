@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 )
@@ -92,10 +91,6 @@ func getAllTeamUsers(token string) ([]string, error) {
 		return nil, fmt.Errorf("request to Slack failed: %w", err)
 	}
 	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	log.Printf("members response - %s", string(body))
-
 	var result struct {
 		OK      bool `json:"ok"`
 		Members []struct {
