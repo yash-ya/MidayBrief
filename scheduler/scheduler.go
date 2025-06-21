@@ -5,6 +5,7 @@ import (
 	"MidayBrief/db"
 	"MidayBrief/utils"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -103,6 +104,8 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 		log.Printf("PostSummaryForTeam: error fetching messages for team %s: %v", team.TeamID, err)
 		return
 	}
+	body, _ := json.Marshal(messages)
+	log.Printf("PostSummaryForTeam: messages found for team %v", body)
 
 	if len(messages) == 0 {
 		log.Printf("PostSummaryForTeam: no messages found for team %s", team.TeamID)
@@ -119,7 +122,8 @@ func formatSummary(messages []db.UserMessage) string {
 	userMap := make(map[string][]string)
 
 	for _, msg := range messages {
-		userMap[msg.UserID] = append(userMap[msg.UserID], msg.Message)
+		message, _ := utils.Decrypt(msg.Message)
+		userMap[msg.UserID] = append(userMap[msg.UserID], message)
 	}
 
 	var summary strings.Builder
