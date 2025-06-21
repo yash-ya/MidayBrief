@@ -105,7 +105,7 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 		return
 	}
 	body, _ := json.Marshal(messages)
-	log.Printf("PostSummaryForTeam: messages found for team %v", body)
+	log.Printf("PostSummaryForTeam: messages found for team %s", body)
 
 	if len(messages) == 0 {
 		log.Printf("PostSummaryForTeam: no messages found for team %s", team.TeamID)
