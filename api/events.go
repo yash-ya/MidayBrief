@@ -185,13 +185,13 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if len(updates) > 0 {
 		response.WriteString("✅ Updates:\n")
 		for _, u := range updates {
-			response.WriteString("- " + u + "\n")
+			response.WriteString("\t• " + u + "\n")
 		}
 	}
 	if len(errors) > 0 {
 		response.WriteString("\n⚠️ Issues:\n")
 		for _, e := range errors {
-			response.WriteString("- " + e + "\n")
+			response.WriteString("\t• " + e + "\n")
 		}
 	}
 	if response.Len() == 0 {
