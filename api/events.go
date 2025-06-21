@@ -159,7 +159,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	}
 
 	if strings.HasPrefix(strings.ToLower(text), "add ") {
-		addUsers := extractUserIDs(text, `add\s+(<@U[0-9A-Z]+>\s*)+`)
+		addUsers := extractUserIDs(text)
 		for _, userID := range addUsers {
 
 			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
@@ -171,7 +171,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	}
 
 	if strings.HasPrefix(strings.ToLower(text), "remove ") {
-		removeUsers := extractUserIDs(text, `remove\s+(<@U[0-9A-Z]+>\s*)+`)
+		removeUsers := extractUserIDs(text)
 		for _, userID := range removeUsers {
 			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
 				updates = append(updates, fmt.Sprintf("removed @%s", userID))
@@ -219,8 +219,8 @@ func extractValue(text, pattern string) string {
 	return ""
 }
 
-func extractUserIDs(text, pattern string) []string {
-	re := regexp.MustCompile(pattern)
+func extractUserIDs(text string) []string {
+	re := regexp.MustCompile(`<@U[0-9A-Z]+>`)
 	matches := re.FindAllString(text, -1)
 	var users []string
 	for _, match := range matches {
