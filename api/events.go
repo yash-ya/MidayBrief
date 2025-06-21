@@ -170,9 +170,9 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		for _, userID := range addUsers {
 
 			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
-				updates = append(updates, fmt.Sprintf("added @%s", userID))
+				updates = append(updates, fmt.Sprintf("added <@%s>", userID))
 			} else {
-				errors = append(errors, fmt.Sprintf("Failed to add @%s", userID))
+				errors = append(errors, fmt.Sprintf("Failed to add <@%s>", userID))
 			}
 		}
 	}
@@ -181,9 +181,9 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		removeUsers := extractUserIDs(text)
 		for _, userID := range removeUsers {
 			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
-				updates = append(updates, fmt.Sprintf("removed @%s", userID))
+				updates = append(updates, fmt.Sprintf("removed <@%s>", userID))
 			} else {
-				errors = append(errors, fmt.Sprintf("Failed to remove @%s", userID))
+				errors = append(errors, fmt.Sprintf("Failed to remove <@%s>", userID))
 			}
 		}
 	}
