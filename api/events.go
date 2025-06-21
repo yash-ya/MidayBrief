@@ -158,19 +158,25 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	for _, userID := range extractUserIDs(text, `<@U[0-9A-Z]+>`) {
-		if err := db.AddPromptUser(team.TeamID, userID); err == nil {
-			updates = append(updates, fmt.Sprintf("added @%s", userID))
-		} else {
-			errors = append(errors, fmt.Sprintf("Failed to add @%s", userID))
+	if strings.HasPrefix(strings.ToLower(text), "add ") {
+		addUsers := extractUserIDs(text, `add\s+(<@U[0-9A-Z]+>\s*)+`)
+		for _, userID := range addUsers {
+			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
+				updates = append(updates, fmt.Sprintf("added @%s", userID))
+			} else {
+				errors = append(errors, fmt.Sprintf("Failed to add @%s", userID))
+			}
 		}
 	}
 
-	for _, userID := range extractUserIDs(text, `<@U[0-9A-Z]+>`) {
-		if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
-			updates = append(updates, fmt.Sprintf("removed @%s", userID))
-		} else {
-			errors = append(errors, fmt.Sprintf("Failed to remove @%s", userID))
+	if strings.HasPrefix(strings.ToLower(text), "remove ") {
+		removeUsers := extractUserIDs(text, `remove\s+(<@U[0-9A-Z]+>\s*)+`)
+		for _, userID := range removeUsers {
+			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
+				updates = append(updates, fmt.Sprintf("removed @%s", userID))
+			} else {
+				errors = append(errors, fmt.Sprintf("Failed to remove @%s", userID))
+			}
 		}
 	}
 
