@@ -2,11 +2,9 @@ package api
 
 import (
 	"MidayBrief/db"
-	"MidayBrief/utils"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 )
@@ -29,14 +27,13 @@ func sendDM(teamID, userChannelID, message string) {
 		return
 	}
 
-	accessToken, _ := utils.Decrypt(team.AccessToken)
 	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("sendDM: failed to create request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Authorization", "Bearer "+team.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -94,15 +91,12 @@ func getAllTeamUsers(token string) ([]string, error) {
 		return nil, fmt.Errorf("request to Slack failed: %w", err)
 	}
 	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	log.Printf("members response - %s", string(body))
-
 	var result struct {
 		OK      bool `json:"ok"`
 		Members []struct {
 			ID      string `json:"id"`
 			IsBot   bool   `json:"is_bot"`
+			Name    string `json:"name"`
 			Deleted bool   `json:"deleted"`
 		} `json:"members"`
 	}
@@ -116,7 +110,7 @@ func getAllTeamUsers(token string) ([]string, error) {
 
 	var userIDs []string
 	for _, member := range result.Members {
-		if !member.IsBot && !member.Deleted {
+		if !member.IsBot && !member.Deleted && member.Name != "slackbot" {
 			userIDs = append(userIDs, member.ID)
 		}
 	}

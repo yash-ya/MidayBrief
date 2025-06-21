@@ -12,5 +12,11 @@ func AddPromptUser(teamID, userID string) error {
 }
 
 func RemovePromptUser(teamID, userID string) error {
-	return DB.Where("team_id = ? AND user_id = ?", teamID, userID).Delete(&UserMessage{}).Error
+	return DB.Where("team_id = ? AND user_id = ?", teamID, userID).Delete(&PromptUser{}).Error
+}
+
+func GetAllPromptUser(teamID string) ([]PromptUser, error) {
+	var users []PromptUser
+	err := DB.Where("team_id = ?", teamID).Find(&users).Error
+	return users, err
 }

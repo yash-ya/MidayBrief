@@ -4,6 +4,7 @@ import (
 	"MidayBrief/db"
 	"MidayBrief/utils"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,9 +51,15 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	text := event.Event.Text
-	log.Printf("User message %s", text)
-	if isConfig(text) {
+	// Check if user is in the middle of a prompt flow
+	ctx := context.Background()
+	if state, err := utils.GetPromptState(team.TeamID, event.Event.User, ctx); err == nil && state != nil {
+		handlePromptStep(event, team, *state, ctx)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if isConfig(event.Event.Text) {
 		handleCombinedConfig(event, team)
 	} else {
 		handleUserMessage(event, team)
@@ -146,7 +153,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if strings.Contains(strings.TrimSpace(strings.ToLower(text)), "add all users") {
 		users, err := getAllTeamUsers(team.AccessToken)
 		if err != nil {
-			errors = append(errors, "Failed to fetch user list for adding.")
+			errors = append(errors, fmt.Sprintf("Failed to fetch user list for adding. Error - %s", err))
 		} else {
 			count := 0
 			for _, userID := range users {
@@ -158,7 +165,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "add all users ") {
+	if strings.HasPrefix(strings.ToLower(text), "add user ") {
 		addUsers := extractUserIDs(text)
 		for _, userID := range addUsers {
 
@@ -170,7 +177,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "remove users ") {
+	if strings.HasPrefix(strings.ToLower(text), "remove user ") {
 		removeUsers := extractUserIDs(text)
 		for _, userID := range removeUsers {
 			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
@@ -185,13 +192,13 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if len(updates) > 0 {
 		response.WriteString("✅ Updates:\n")
 		for _, u := range updates {
-			response.WriteString("- " + u + "\n")
+			response.WriteString("\t• " + u + "\n")
 		}
 	}
 	if len(errors) > 0 {
 		response.WriteString("\n⚠️ Issues:\n")
 		for _, e := range errors {
-			response.WriteString("- " + e + "\n")
+			response.WriteString("\t• " + e + "\n")
 		}
 	}
 	if response.Len() == 0 {
@@ -228,6 +235,43 @@ func extractUserIDs(text string) []string {
 		users = append(users, userID)
 	}
 	return users
+}
+
+func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptState, ctx context.Context) {
+	userID := event.Event.User
+	teamID := team.TeamID
+	text := strings.TrimSpace(event.Event.Text)
+
+	switch state.Step {
+	case 1:
+		state.Responses["yesterday"] = text
+		state.Step = 2
+		utils.SetPromptState(teamID, userID, state, ctx)
+		SendMessage(teamID, userID, "Got it! What are your plans for today?")
+	case 2:
+		state.Responses["today"] = text
+		state.Step = 3
+		utils.SetPromptState(teamID, userID, state, ctx)
+		SendMessage(teamID, userID, "Thanks! Do you have any blockers?")
+	case 3:
+		state.Responses["blockers"] = text
+		saveFinalPrompt(teamID, userID, state)
+		utils.DeletePromptState(teamID, userID, ctx)
+		SendMessage(teamID, userID, "All set! Your standup update has been recorded.")
+	default:
+		utils.DeletePromptState(teamID, userID, ctx)
+		SendMessage(teamID, userID, "Unexpected error. Prompt session cleared. Please try again.")
+	}
+}
+
+func saveFinalPrompt(teamID, userID string, state utils.PromptState) {
+	final := fmt.Sprintf("Yesterday: %s\nToday: %s\nBlockers: %s",
+		state.Responses["yesterday"], state.Responses["today"], state.Responses["blockers"])
+
+	encrypted, _ := utils.Encrypt(final)
+	if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
+		log.Printf("Failed to save final prompt message: %v", err)
+	}
 }
 
 type SlackMessage struct {
