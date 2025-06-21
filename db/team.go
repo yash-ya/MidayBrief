@@ -33,6 +33,11 @@ func SaveTeamConfig(team TeamConfig) error {
 func GetAllTeamConfigs() ([]TeamConfig, error) {
 	var teams []TeamConfig
 	err := DB.Find(&teams).Error
+	if len(teams) > 0 {
+		for _, team := range teams {
+			team.AccessToken, _ = utils.Decrypt(team.AccessToken)
+		}
+	}
 	return teams, err
 }
 

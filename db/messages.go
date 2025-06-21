@@ -23,14 +23,8 @@ func SaveUserMessage(teamID, userID, text string) error {
 }
 
 func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMessage, error) {
-	now := time.Now().In(location)
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
-	endOfDay := startOfDay.Add(24 * time.Hour)
-	startOfDayInUTC := startOfDay.UTC()
-	endOfDayInUTC := endOfDay.UTC()
-
 	var messages []UserMessage
-	err := DB.Where("team_id = ? AND timestamp >= ? AND timestamp < ?", teamID, startOfDayInUTC, endOfDayInUTC).Find(&messages).Error
+	err := DB.Where("team_id = ?", teamID).Find(&messages).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("GetMessagesForTeamToday: failed to fetch messages for team %s: %w", teamID, err)

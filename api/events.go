@@ -240,6 +240,7 @@ func extractUserIDs(text string) []string {
 func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptState, ctx context.Context) {
 	userID := event.Event.User
 	teamID := team.TeamID
+	accessToken := team.AccessToken
 	text := strings.TrimSpace(event.Event.Text)
 
 	switch state.Step {
@@ -247,20 +248,20 @@ func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptS
 		state.Responses["yesterday"] = text
 		state.Step = 2
 		utils.SetPromptState(teamID, userID, state, ctx)
-		SendMessage(teamID, userID, "Got it! What are your plans for today?")
+		SendMessage(accessToken, userID, "Got it! What are your plans for today?")
 	case 2:
 		state.Responses["today"] = text
 		state.Step = 3
 		utils.SetPromptState(teamID, userID, state, ctx)
-		SendMessage(teamID, userID, "Thanks! Do you have any blockers?")
+		SendMessage(accessToken, userID, "Thanks! Do you have any blockers?")
 	case 3:
 		state.Responses["blockers"] = text
 		saveFinalPrompt(teamID, userID, state)
 		utils.DeletePromptState(teamID, userID, ctx)
-		SendMessage(teamID, userID, "All set! Your standup update has been recorded.")
+		SendMessage(accessToken, userID, "All set! Your standup update has been recorded.")
 	default:
 		utils.DeletePromptState(teamID, userID, ctx)
-		SendMessage(teamID, userID, "Unexpected error. Prompt session cleared. Please try again.")
+		SendMessage(accessToken, userID, "Unexpected error. Prompt session cleared. Please try again.")
 	}
 }
 
@@ -279,7 +280,7 @@ type SlackMessage struct {
 	Text    string `json:"text"`
 }
 
-func SendMessage(token, channel, text string) error {
+func SendMessage(accessToken, channel, text string) error {
 	msg := SlackMessage{
 		Channel: channel,
 		Text:    text,
@@ -289,12 +290,12 @@ func SendMessage(token, channel, text string) error {
 	if err != nil {
 		return fmt.Errorf("SendMessage: failed to marshal message: %w", err)
 	}
-
 	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("SendMessage: failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
