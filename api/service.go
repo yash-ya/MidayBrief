@@ -96,6 +96,7 @@ func getAllTeamUsers(token string) ([]string, error) {
 		Members []struct {
 			ID      string `json:"id"`
 			IsBot   bool   `json:"is_bot"`
+			Name    string `json:"name"`
 			Deleted bool   `json:"deleted"`
 		} `json:"members"`
 	}
@@ -109,7 +110,7 @@ func getAllTeamUsers(token string) ([]string, error) {
 
 	var userIDs []string
 	for _, member := range result.Members {
-		if !member.IsBot && !member.Deleted {
+		if !member.IsBot && !member.Deleted && member.Name != "slackbot" {
 			userIDs = append(userIDs, member.ID)
 		}
 	}
