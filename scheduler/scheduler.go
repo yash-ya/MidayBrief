@@ -112,8 +112,13 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 		return
 	}
 
+	accessToken, decryptErr := utils.Decrypt(team.AccessToken)
+	if decryptErr != nil {
+		log.Printf("AccessToken Decryption Error %s: %v", team.AccessToken, decryptErr)
+	}
+
 	summary := formatSummary(messages)
-	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
+	if err := api.SendMessage(accessToken, team.ChannelID, summary); err != nil {
 		log.Printf("PostSummaryForTeam: failed to post summary to Slack for team %s: %v", team.TeamID, err)
 	}
 }
