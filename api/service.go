@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 )
@@ -94,13 +95,15 @@ func getAllTeamUsers(token string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+	log.Printf("members response - %s", string(body))
+
 	var result struct {
 		OK      bool `json:"ok"`
 		Members []struct {
-			ID       string `json:"id"`
-			IsBot    bool   `json:"is_bot"`
-			Deleted  bool   `json:"deleted"`
-			RealName string `json:"real_name"`
+			ID      string `json:"id"`
+			IsBot   bool   `json:"is_bot"`
+			Deleted bool   `json:"deleted"`
 		} `json:"members"`
 	}
 
@@ -108,7 +111,7 @@ func getAllTeamUsers(token string) ([]string, error) {
 		return nil, fmt.Errorf("decode response failed: %w", err)
 	}
 	if !result.OK {
-		return nil, fmt.Errorf("Slack API returned not OK")
+		return nil, fmt.Errorf("slack api returned not OK")
 	}
 
 	var userIDs []string
