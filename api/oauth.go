@@ -66,7 +66,6 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to read OAuth response", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("oauth response - %s", string(body))
 
 	var oauthResp OAuthResponse
 	if err := json.Unmarshal(body, &oauthResp); err != nil {
