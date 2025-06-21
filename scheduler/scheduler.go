@@ -80,7 +80,7 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		err := api.SendMessage(team.TeamID, user.UserID, promptMessage)
+		err := api.SendMessage(team.AccessToken, user.UserID, promptMessage)
 		if err != nil {
 			log.Printf("Failed to send first prompt to user %s: %v", user.UserID, err)
 		}
