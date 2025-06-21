@@ -161,6 +161,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if strings.HasPrefix(strings.ToLower(text), "add ") {
 		addUsers := extractUserIDs(text, `add\s+(<@U[0-9A-Z]+>\s*)+`)
 		for _, userID := range addUsers {
+
 			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 				updates = append(updates, fmt.Sprintf("added @%s", userID))
 			} else {
@@ -220,13 +221,11 @@ func extractValue(text, pattern string) string {
 
 func extractUserIDs(text, pattern string) []string {
 	re := regexp.MustCompile(pattern)
-	matches := re.FindAllStringSubmatch(text, -1)
+	matches := re.FindAllString(text, -1)
 	var users []string
-	for _, m := range matches {
-		if len(m) >= 2 {
-			log.Println(m[1])
-			users = append(users, m[1])
-		}
+	for _, match := range matches {
+		userID := strings.Trim(match, "<@>")
+		users = append(users, userID)
 	}
 	return users
 }
