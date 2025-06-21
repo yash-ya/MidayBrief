@@ -19,7 +19,8 @@ const (
 		"3️⃣ Set a time to prompt your team for updates:\n" +
 		"`prompt time HH:MM`  → Example: `prompt time 09:30`\n\n" +
 		"4️⃣ Decide who gets prompted:\n" +
-		"• To include everyone: `add all`\n" +
+		"• To include everyone: `add all users`\n" +
 		"• To choose specific people: `add user @alice @bob`\n\n" +
+		"• To remove specific people: `remove user @alice @bob`\n\n" +
 		"🛠️ You can always tweak these settings later by sending the individual commands above."
 )
