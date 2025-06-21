@@ -158,7 +158,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		}
 	}
 
-	if strings.HasPrefix(strings.ToLower(text), "add users ") {
+	if strings.HasPrefix(strings.ToLower(text), "add all users ") {
 		addUsers := extractUserIDs(text)
 		for _, userID := range addUsers {
 
