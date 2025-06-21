@@ -12,6 +12,7 @@ import (
 
 func main() {
 	db.Init()
+	utils.InitRedis()
 	utils.InitCrypto()
 	go scheduler.StartScheduler()
 	router := SetupRouter()
