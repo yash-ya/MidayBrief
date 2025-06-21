@@ -108,7 +108,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 
 	if channelID := extractChannelID(text); channelID != "" {
 		if err := db.UpdateChannelID(team.TeamID, channelID); err == nil {
-			updates = append(updates, fmt.Sprintf("channel updated to %s", channelID))
+			updates = append(updates, fmt.Sprintf("channel updated to %s#", channelID))
 		} else {
 			errors = append(errors, "Failed to update channel.")
 		}

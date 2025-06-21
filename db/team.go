@@ -2,7 +2,9 @@ package db
 
 import (
 	"MidayBrief/utils"
+	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -38,6 +40,8 @@ func GetAllTeamConfigs() ([]TeamConfig, error) {
 			team.AccessToken, _ = utils.Decrypt(team.AccessToken)
 		}
 	}
+	body, _ := json.Marshal(teams)
+	log.Printf("Teams Details - %s", body)
 	return teams, err
 }
 
