@@ -41,7 +41,7 @@ func GetAllTeamConfigs() ([]TeamConfig, error) {
 		return nil, err
 	}
 
-	log.Printf("[INFO] GetAllTeamConfigs: fetched %d team configs\n", len(teams))
+	/// log.Printf("[INFO] GetAllTeamConfigs: fetched %d team configs\n", len(teams))
 	return teams, nil
 }
 

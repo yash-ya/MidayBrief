@@ -67,7 +67,7 @@ func processSchedule(now time.Time) {
 }
 
 func checkExpiredPrompts(ctx context.Context) {
-	log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
+	/// log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
 
 	var cursor uint64
 	for {
