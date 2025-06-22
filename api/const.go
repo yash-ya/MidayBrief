@@ -23,4 +23,12 @@ const (
 		"• To choose specific people: `add user @alice @bob`\n\n" +
 		"• To remove specific people: `remove user @alice @bob`\n\n" +
 		"🛠️ You can always tweak these settings later by sending the individual commands above."
+	slackUserWelcomeMessage = " Hey there! I’m *MidayBrief*, your daily standup buddy.\n\n" +
+		"Each day, I’ll ask you 3 quick questions: \n" +
+		"1. What you did yesterday\n" +
+		"2. What you plan to do today\n" +
+		"3. Any blockers in your way\n\n" +
+		"At the scheduled post time, I’ll compile everyone’s responses and share the team summary in the standup channel.\n" +
+		"If you ever want to reinitiate your update, just type: *update*\n" +
+		"Let’s keep things short and crisp. Talk soon! 🙂`\n"
 )

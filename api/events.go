@@ -3,7 +3,6 @@ package api
 import (
 	"MidayBrief/db"
 	"MidayBrief/utils"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -84,7 +83,7 @@ func isConfig(text string) bool {
 func handleUserMessage(event SlackEvent, team *db.TeamConfig) {
 	hash := utils.Hash(event.Event.Text)
 	if db.IsDuplicateMessage(event.TeamID, event.Event.User, hash, team.Timezone) {
-		sendDM(event.TeamID, event.Event.Channel, "Looks like you've already sent this update today.")
+		SendMessage(team.AccessToken, event.Event.Channel, "Looks like you've already sent this update today.")
 		return
 	}
 
@@ -93,13 +92,13 @@ func handleUserMessage(event SlackEvent, team *db.TeamConfig) {
 		log.Printf("Failed to save user message: %v", err)
 	} else {
 		log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)
-		sendDM(event.TeamID, event.Event.Channel, "Got your update for today!")
+		SendMessage(team.AccessToken, event.Event.Channel, "Got your update for today!")
 	}
 }
 
 func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 	if event.Event.User != team.AdminUserID {
-		sendDM(team.TeamID, event.Event.Channel, "Only the admin can update team settings.")
+		SendMessage(team.AccessToken, event.Event.Channel, "Only the admin can update team settings.")
 		return
 	}
 
@@ -159,6 +158,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 			for _, userID := range users {
 				if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 					count++
+					FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
 				}
 			}
 			updates = append(updates, fmt.Sprintf("added %d users for prompts", count))
@@ -171,6 +171,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 
 			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 				updates = append(updates, fmt.Sprintf("added <@%s>", userID))
+				FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
 			} else {
 				errors = append(errors, fmt.Sprintf("Failed to add <@%s>", userID))
 			}
@@ -205,7 +206,7 @@ func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
 		response.WriteString("No valid configuration found.\nTry: `config #channel`, `post time 17:00`, `timezone Asia/Kolkata`, `add all`, `add/remove @user`.")
 	}
 
-	sendDM(team.TeamID, event.Event.Channel, response.String())
+	SendMessage(team.AccessToken, event.Event.Channel, response.String())
 }
 
 func extractChannelID(text string) string {
@@ -281,40 +282,4 @@ func saveFinalPrompt(teamID, userID string, state utils.PromptState) {
 	if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
 		log.Printf("Failed to save final prompt message: %v", err)
 	}
-}
-
-type SlackMessage struct {
-	Channel string `json:"channel"`
-	Text    string `json:"text"`
-}
-
-func SendMessage(accessToken, channel, text string) error {
-	msg := SlackMessage{
-		Channel: channel,
-		Text:    text,
-	}
-
-	body, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("SendMessage: failed to marshal message: %w", err)
-	}
-	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
-	if err != nil {
-		return fmt.Errorf("SendMessage: failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("SendMessage: failed to send request to Slack API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("SendMessage: Slack API responded with status %s", resp.Status)
-	}
-
-	return nil
 }

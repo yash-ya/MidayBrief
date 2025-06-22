@@ -104,7 +104,7 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	welcomeMsg := fmt.Sprintf(slackWelcomeMessage, timezone)
-	sendDM(oauthResp.Team.ID, oauthResp.AuthedUser.ID, welcomeMsg)
+	SendMessage(oauthResp.AccessToken, oauthResp.AuthedUser.ID, welcomeMsg)
 
 	log.Printf("OAuth successful for team %s (%s)", oauthResp.Team.Name, oauthResp.Team.ID)
 	w.WriteHeader(http.StatusOK)

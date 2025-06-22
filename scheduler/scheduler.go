@@ -81,12 +81,7 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		accessToken, decryptErr := utils.Decrypt(team.AccessToken)
-		if decryptErr != nil {
-			log.Printf("AccessToken Decryption Error %s: %v", team.AccessToken, decryptErr)
-		}
-
-		err := api.SendMessage(accessToken, user.UserID, promptMessage)
+		err := api.SendMessage(team.AccessToken, user.UserID, promptMessage)
 		if err != nil {
 			log.Printf("Failed to send first prompt to user %s: %v", user.UserID, err)
 		}
@@ -110,13 +105,8 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 		return
 	}
 
-	accessToken, decryptErr := utils.Decrypt(team.AccessToken)
-	if decryptErr != nil {
-		log.Printf("AccessToken Decryption Error %s: %v", team.AccessToken, decryptErr)
-	}
-
 	summary := formatSummary(messages)
-	if err := api.SendMessage(accessToken, team.ChannelID, summary); err != nil {
+	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
 		log.Printf("PostSummaryForTeam: failed to post summary to Slack for team %s: %v", team.TeamID, err)
 	}
 }

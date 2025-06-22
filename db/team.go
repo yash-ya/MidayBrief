@@ -1,7 +1,6 @@
 package db
 
 import (
-	"MidayBrief/utils"
 	"fmt"
 	"time"
 
@@ -42,7 +41,6 @@ func GetTeamConfig(teamID string) (*TeamConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetTeamConfig: failed to retrieve team %s: %w", teamID, err)
 	}
-	team.AccessToken, _ = utils.Decrypt(team.AccessToken)
 	return &team, nil
 }
 
