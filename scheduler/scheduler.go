@@ -104,8 +104,6 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 		log.Printf("PostSummaryForTeam: error fetching messages for team %s: %v", team.TeamID, err)
 		return
 	}
-	body, _ := json.Marshal(messages)
-	log.Printf("PostSummaryForTeam: messages found for team %s", body)
 
 	if len(messages) == 0 {
 		log.Printf("PostSummaryForTeam: no messages found for team %s", team.TeamID)
