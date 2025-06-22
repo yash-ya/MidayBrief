@@ -9,7 +9,6 @@ import (
 
 func LoadEnv() {
 	if os.Getenv("RAILWAY_ENVIRONMENT") == "" {
-		// Only load .env locally
 		_ = godotenv.Load()
 		err := godotenv.Load()
 		if err != nil {

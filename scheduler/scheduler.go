@@ -18,7 +18,7 @@ func StartScheduler() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	log.Println("Scheduler started...")
+	log.Println("[INFO] Scheduler started...")
 
 	for now := range ticker.C {
 		processSchedule(now)
@@ -28,7 +28,7 @@ func StartScheduler() {
 func processSchedule(now time.Time) {
 	teams, err := db.GetAllTeamConfigs()
 	if err != nil {
-		log.Println("Failed to fetch team configs:", err)
+		log.Printf("[ERROR] Failed to fetch team configs: %v", err)
 		return
 	}
 
@@ -39,23 +39,74 @@ func processSchedule(now time.Time) {
 
 		loc, err := time.LoadLocation(team.Timezone)
 		if err != nil {
-			log.Printf("Invalid timezone for team %s: %s\n", team.TeamID, team.Timezone)
+			log.Printf("[WARN] Invalid timezone for team %s: %s", team.TeamID, team.Timezone)
 			continue
 		}
 
-		localTime := now.In(loc).Format("15:04")
+		localTime := now.In(loc)
+		formatted := localTime.Format("15:04")
 
-		if localTime == team.PromptTime {
-			log.Printf("Triggering prompt for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
+		if formatted == team.PromptTime {
+			log.Printf("[INFO] Triggering prompt for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
 			go triggerPromptForTeam(team)
 		}
 
-		if localTime == team.PostTime {
-			log.Printf("Triggering post summary for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
+		if formatted == team.PostTime {
+			log.Printf("[INFO] Triggering post summary for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
 			go postSummaryForTeam(team, loc)
+
 			if err := db.CleanupMessages(team.TeamID); err != nil {
-				log.Printf("Failed to clean messages for team %s: %v", team.TeamID, err)
+				log.Printf("[ERROR] Failed to clean messages for team %s: %v", team.TeamID, err)
 			}
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	checkExpiredPrompts(ctx)
+}
+
+func checkExpiredPrompts(ctx context.Context) {
+	log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
+
+	var cursor uint64
+	for {
+		keys, newCursor, err := utils.RedisClient.Scan(ctx, cursor, "prompt_expiry:*", 100).Result()
+		if err != nil {
+			log.Printf("[ERROR] Redis SCAN failed: %v", err)
+			break
+		}
+		cursor = newCursor
+
+		for _, key := range keys {
+			ttl, err := utils.RedisClient.TTL(ctx, key).Result()
+			if err != nil {
+				log.Printf("[ERROR] Failed to get TTL for key %s: %v", key, err)
+				continue
+			}
+			if ttl > 0 {
+				continue
+			}
+
+			parts := strings.Split(key, ":")
+			if len(parts) != 3 {
+				log.Printf("[WARN] Invalid key format: %s", key)
+				continue
+			}
+			teamID, userID := parts[1], parts[2]
+
+			state, err := utils.GetPromptState(teamID, userID, ctx)
+			if err == nil && state.Step < 4 {
+				log.Printf("[WARN] Prompt session expired for user %s in team %s", userID, teamID)
+				api.SendMessage(teamID, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
+			}
+
+			_ = utils.RedisClient.Del(ctx, key).Err()
+			_ = utils.DeletePromptState(teamID, userID, ctx)
+		}
+
+		if cursor == 0 {
+			break
 		}
 	}
 }
@@ -66,7 +117,7 @@ func triggerPromptForTeam(team db.TeamConfig) {
 
 	users, err := db.GetAllPromptUser(team.TeamID)
 	if err != nil {
-		log.Printf("Failed to get prompt users for %s: %v", team.TeamID, err)
+		log.Printf("[ERROR] Failed to get prompt users for team %s: %v", team.TeamID, err)
 		return
 	}
 
@@ -74,40 +125,42 @@ func triggerPromptForTeam(team db.TeamConfig) {
 		state := utils.PromptState{
 			Step:      1,
 			Responses: make(map[string]string),
+			StartedAt: time.Now(),
 		}
 
 		if err := utils.SetPromptState(team.TeamID, user.UserID, state, ctx); err != nil {
-			log.Printf("Failed to set prompt state for user %s: %v", user.UserID, err)
+			log.Printf("[ERROR] Failed to set prompt state for user %s: %v", user.UserID, err)
 			continue
 		}
 
-		err := api.SendMessage(team.AccessToken, user.UserID, promptMessage)
-		if err != nil {
-			log.Printf("Failed to send first prompt to user %s: %v", user.UserID, err)
+		_ = utils.SetPromptExpiry(team.TeamID, user.UserID, ctx)
+
+		if err := api.SendMessage(team.AccessToken, user.UserID, promptMessage); err != nil {
+			log.Printf("[ERROR] Failed to send prompt to user %s: %v", user.UserID, err)
 		}
 	}
 }
 
 func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 	if team.AccessToken == "" || team.ChannelID == "" {
-		log.Printf("PostSummaryForTeam: missing credentials for team %s", team.TeamID)
+		log.Printf("[ERROR] Missing credentials for team %s", team.TeamID)
 		return
 	}
 
 	messages, err := db.GetMessagesForTeamToday(team.TeamID, location)
 	if err != nil {
-		log.Printf("PostSummaryForTeam: error fetching messages for team %s: %v", team.TeamID, err)
+		log.Printf("[ERROR] Error fetching messages for team %s: %v", team.TeamID, err)
 		return
 	}
 
 	if len(messages) == 0 {
-		log.Printf("PostSummaryForTeam: no messages found for team %s", team.TeamID)
+		log.Printf("[INFO] No messages found for team %s", team.TeamID)
 		return
 	}
 
 	summary := formatSummary(messages)
 	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
-		log.Printf("PostSummaryForTeam: failed to post summary to Slack for team %s: %v", team.TeamID, err)
+		log.Printf("[ERROR] Failed to post summary for team %s: %v", team.TeamID, err)
 	}
 }
 
@@ -127,13 +180,14 @@ func formatSummary(messages []db.UserMessage) string {
 		for _, enc := range encryptedMessages {
 			decrypted, err := utils.Decrypt(enc)
 			if err != nil {
-				log.Printf("Error decrypting message for user %s: %v", userID, err)
+				log.Printf("[ERROR] Error decrypting message for user %s: %v", userID, err)
 				continue
 			}
 
 			var parsed map[string]string
 			if err := json.Unmarshal([]byte(decrypted), &parsed); err != nil {
-				summary.WriteString(fmt.Sprintf("   - %s\n", decrypted)) // fallback
+				log.Printf("[WARN] Fallback to raw message for user %s", userID)
+				summary.WriteString(fmt.Sprintf("   - %s\n", decrypted))
 				continue
 			}
 

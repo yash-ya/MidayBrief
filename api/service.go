@@ -15,7 +15,7 @@ func FireAndForgetDM(accessToken, userChannel, message string) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Println("Recovered from panic in DM goroutine:", r)
+				log.Printf("[WARN] Recovered from panic in DM goroutine: %v\n", r)
 			}
 		}()
 
@@ -23,7 +23,7 @@ func FireAndForgetDM(accessToken, userChannel, message string) {
 		defer cancel()
 
 		if err := SendMessageWithContext(ctx, accessToken, userChannel, message); err != nil {
-			log.Printf("Failed to send DM to %s: %v", userChannel, err)
+			log.Printf("[ERROR] Failed to send DM to %s: %v\n", userChannel, err)
 		}
 	}()
 }
@@ -31,7 +31,7 @@ func FireAndForgetDM(accessToken, userChannel, message string) {
 func SendMessageWithContext(ctx context.Context, accessToken, userChannel, message string) error {
 	decryptedAccessToken, err := utils.Decrypt(accessToken)
 	if err != nil {
-		log.Printf("SendMessage: Error in decrypt access token %s", err)
+		log.Printf("[WARN] Failed to decrypt access token, using fallback: %v\n", err)
 		decryptedAccessToken = accessToken
 	}
 
@@ -67,10 +67,9 @@ func SendMessageWithContext(ctx context.Context, accessToken, userChannel, messa
 }
 
 func SendMessage(accessToken, userChannel, message string) error {
-
 	decryptedAccessToken, err := utils.Decrypt(accessToken)
 	if err != nil {
-		log.Printf("SendMessage: Error in decrypt access token %s", err)
+		log.Printf("[WARN] Failed to decrypt access token, using fallback: %v\n", err)
 		decryptedAccessToken = accessToken
 	}
 
@@ -81,11 +80,12 @@ func SendMessage(accessToken, userChannel, message string) error {
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("SendMessage: failed to marshal message: %w", err)
+		return fmt.Errorf("marshal message: %w", err)
 	}
+
 	req, err := http.NewRequest("POST", slackPostMessagesURL, bytes.NewBuffer(body))
 	if err != nil {
-		return fmt.Errorf("SendMessage: failed to create request: %w", err)
+		return fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", decryptedAccessToken))
@@ -93,12 +93,12 @@ func SendMessage(accessToken, userChannel, message string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("SendMessage: failed to send request to Slack API: %w", err)
+		return fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("SendMessage: Slack API responded with status %s", resp.Status)
+		return fmt.Errorf("slack returned status: %s", resp.Status)
 	}
 
 	return nil
@@ -107,13 +107,13 @@ func SendMessage(accessToken, userChannel, message string) error {
 func getUserTimeZone(accessToken, userID string) (string, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s?user=%s", slackUserInfoURL, userID), nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("slack request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -125,11 +125,11 @@ func getUserTimeZone(accessToken, userID string) (string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+		return "", fmt.Errorf("decode response failed: %w", err)
 	}
 
 	if !result.OK {
-		return "", fmt.Errorf("slack api error: could not get timezone")
+		return "", fmt.Errorf("slack API error: could not get timezone")
 	}
 
 	return result.User.TZ, nil
@@ -138,16 +138,17 @@ func getUserTimeZone(accessToken, userID string) (string, error) {
 func getAllTeamUsers(token string) ([]string, error) {
 	req, err := http.NewRequest("GET", slackUsersListURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create request failed: %w", err)
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request to Slack failed: %w", err)
+		return nil, fmt.Errorf("slack request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
 	var result struct {
 		OK      bool `json:"ok"`
 		Members []struct {
@@ -159,10 +160,10 @@ func getAllTeamUsers(token string) ([]string, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response failed: %w", err)
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	if !result.OK {
-		return nil, fmt.Errorf("slack api returned not OK")
+		return nil, fmt.Errorf("slack API returned not OK")
 	}
 
 	var userIDs []string
@@ -171,5 +172,7 @@ func getAllTeamUsers(token string) ([]string, error) {
 			userIDs = append(userIDs, member.ID)
 		}
 	}
+
+	log.Printf("[INFO] Retrieved %d valid team users from Slack\n", len(userIDs))
 	return userIDs, nil
 }

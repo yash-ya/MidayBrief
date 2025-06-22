@@ -5,19 +5,18 @@ import (
 	"MidayBrief/utils"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 )
 
 func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Unable to read request body", http.StatusBadRequest)
+		log.Printf("[ERROR] Failed to read Slack request body: %v\n", err)
 		return
 	}
 
@@ -31,17 +30,20 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	var event SlackEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		http.Error(w, "Invalid Slack event format", http.StatusBadRequest)
+		log.Printf("[ERROR] Failed to parse Slack event: %v\n", err)
 		return
 	}
 
 	if event.Event.Text == "" {
 		http.Error(w, "Empty text message", http.StatusBadRequest)
+		log.Printf("[WARN] Ignored empty text message\n")
 		return
 	}
 
 	team, err := db.GetTeamConfig(event.TeamID)
 	if err != nil {
 		http.Error(w, "Team not configured", http.StatusBadRequest)
+		log.Printf("[ERROR] Team config fetch failed for team %s: %v\n", event.TeamID, err)
 		return
 	}
 
@@ -50,7 +52,6 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user is in the middle of a prompt flow
 	ctx := context.Background()
 	if state, err := utils.GetPromptState(team.TeamID, event.Event.User, ctx); err == nil && state != nil {
 		handlePromptStep(event, team, *state, ctx)
@@ -60,6 +61,9 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 
 	if isConfig(event.Event.Text) {
 		handleCombinedConfig(event, team)
+	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "update") && !utils.CanUpdateNow(team.PostTime, team.Timezone) {
+		SendMessage(team.AccessToken, event.Event.Channel, "You're too close to the posting time. Updates are only allowed until 30 minutes before the summary is posted.")
+		return
 	} else {
 		handleUserMessage(event, team)
 	}
@@ -89,153 +93,11 @@ func handleUserMessage(event SlackEvent, team *db.TeamConfig) {
 
 	encryptedMessage, _ := utils.Encrypt(event.Event.Text)
 	if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
-		log.Printf("Failed to save user message: %v", err)
+		log.Printf("[ERROR] Failed to save user message: %v\n", err)
 	} else {
-		log.Printf("User message saved for team %s, user %s", event.TeamID, event.Event.User)
+		log.Printf("[INFO] Saved user message for team %s, user %s\n", event.TeamID, event.Event.User)
 		SendMessage(team.AccessToken, event.Event.Channel, "Got your update for today!")
 	}
-}
-
-func handleCombinedConfig(event SlackEvent, team *db.TeamConfig) {
-	if event.Event.User != team.AdminUserID {
-		SendMessage(team.AccessToken, event.Event.Channel, "Only the admin can update team settings.")
-		return
-	}
-
-	text := event.Event.Text
-	var updates, errors []string
-
-	if channelID := extractChannelID(text); channelID != "" {
-		if err := db.UpdateChannelID(team.TeamID, channelID); err == nil {
-			updates = append(updates, fmt.Sprintf("channel updated to %s#", channelID))
-		} else {
-			errors = append(errors, "Failed to update channel.")
-		}
-	}
-
-	if timeStr := extractValue(text, `post time (\d{2}:\d{2})`); timeStr != "" {
-		if _, err := time.Parse("15:04", timeStr); err == nil {
-			if err := db.UpdatePostTime(team.TeamID, timeStr); err == nil {
-				updates = append(updates, fmt.Sprintf("post time updated to %s", timeStr))
-			} else {
-				errors = append(errors, "Failed to update post time.")
-			}
-		} else {
-			errors = append(errors, "Invalid time format. Use 24-hr format like: post time 17:00.")
-		}
-	}
-
-	if zone := extractValue(text, `timezone ([A-Za-z]+/[A-Za-z_]+)`); zone != "" {
-		if _, err := time.LoadLocation(zone); err == nil {
-			if err := db.UpdateTimezone(team.TeamID, zone); err == nil {
-				updates = append(updates, fmt.Sprintf("timezone updated to %s", zone))
-			} else {
-				errors = append(errors, "Failed to update timezone.")
-			}
-		} else {
-			errors = append(errors, fmt.Sprintf("Invalid timezone: '%s'. Use format like: timezone Asia/Kolkata.", zone))
-		}
-	}
-
-	if promptTime := extractValue(text, `prompt time (\d{2}:\d{2})`); promptTime != "" {
-		if _, err := time.Parse("15:04", promptTime); err == nil {
-			if err := db.UpdatePromptTime(team.TeamID, promptTime); err == nil {
-				updates = append(updates, fmt.Sprintf("prompt time updated to %s", promptTime))
-			} else {
-				errors = append(errors, "Failed to update prompt time.")
-			}
-		} else {
-			errors = append(errors, "Invalid time format. Use 24-hr format like: prompt time 10:00.")
-		}
-	}
-
-	if strings.Contains(strings.TrimSpace(strings.ToLower(text)), "add all users") {
-		users, err := getAllTeamUsers(team.AccessToken)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("Failed to fetch user list for adding. Error - %s", err))
-		} else {
-			count := 0
-			for _, userID := range users {
-				if err := db.AddPromptUser(team.TeamID, userID); err == nil {
-					count++
-					FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
-				}
-			}
-			updates = append(updates, fmt.Sprintf("added %d users for prompts", count))
-		}
-	}
-
-	if strings.HasPrefix(strings.ToLower(text), "add user ") {
-		addUsers := extractUserIDs(text)
-		for _, userID := range addUsers {
-
-			if err := db.AddPromptUser(team.TeamID, userID); err == nil {
-				updates = append(updates, fmt.Sprintf("added <@%s>", userID))
-				FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
-			} else {
-				errors = append(errors, fmt.Sprintf("Failed to add <@%s>", userID))
-			}
-		}
-	}
-
-	if strings.HasPrefix(strings.ToLower(text), "remove user ") {
-		removeUsers := extractUserIDs(text)
-		for _, userID := range removeUsers {
-			if err := db.RemovePromptUser(team.TeamID, userID); err == nil {
-				updates = append(updates, fmt.Sprintf("removed <@%s>", userID))
-			} else {
-				errors = append(errors, fmt.Sprintf("Failed to remove <@%s>", userID))
-			}
-		}
-	}
-
-	var response strings.Builder
-	if len(updates) > 0 {
-		response.WriteString("✅ Updates:\n")
-		for _, u := range updates {
-			response.WriteString("\t• " + u + "\n")
-		}
-	}
-	if len(errors) > 0 {
-		response.WriteString("\n⚠️ Issues:\n")
-		for _, e := range errors {
-			response.WriteString("\t• " + e + "\n")
-		}
-	}
-	if response.Len() == 0 {
-		response.WriteString("No valid configuration found.\nTry: `config #channel`, `post time 17:00`, `timezone Asia/Kolkata`, `add all`, `add/remove @user`.")
-	}
-
-	SendMessage(team.AccessToken, event.Event.Channel, response.String())
-}
-
-func extractChannelID(text string) string {
-	re := regexp.MustCompile(`config\s+<#(C\w+)\|?[^>]*>`)
-	matches := re.FindStringSubmatch(text)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
-}
-
-func extractValue(text, pattern string) string {
-	re := regexp.MustCompile(pattern)
-	matches := re.FindStringSubmatch(text)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
-}
-
-func extractUserIDs(text string) []string {
-	re := regexp.MustCompile(`<@U[0-9A-Z]+>`)
-	matches := re.FindAllString(text, -1)
-	var users []string
-	for _, match := range matches {
-		userID := strings.Trim(match, "<@>")
-		users = append(users, userID)
-	}
-	return users
 }
 
 func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptState, ctx context.Context) {
@@ -263,23 +125,24 @@ func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptS
 	default:
 		utils.DeletePromptState(teamID, userID, ctx)
 		SendMessage(accessToken, userID, "Unexpected error. Prompt session cleared. Please try again.")
+		log.Printf("[WARN] Unexpected state step for user %s on team %s. Session cleared.\n", userID, teamID)
 	}
 }
 
 func saveFinalPrompt(teamID, userID string, state utils.PromptState) {
 	jsonResponse, err := json.Marshal(state.Responses)
 	if err != nil {
-		log.Printf("Failed to marshal prompt responses: %v", err)
+		log.Printf("[ERROR] Failed to marshal prompt responses: %v\n", err)
 		return
 	}
 
 	encrypted, err := utils.Encrypt(string(jsonResponse))
 	if err != nil {
-		log.Printf("Failed to encrypt prompt response: %v", err)
+		log.Printf("[ERROR] Failed to encrypt prompt responses: %v\n", err)
 		return
 	}
 
 	if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
-		log.Printf("Failed to save final prompt message: %v", err)
+		log.Printf("[ERROR] Failed to save encrypted prompt response: %v\n", err)
 	}
 }

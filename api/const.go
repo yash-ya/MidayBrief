@@ -30,5 +30,5 @@ const (
 		"3. Any blockers in your way\n\n" +
 		"At the scheduled post time, I’ll compile everyone’s responses and share the team summary in the standup channel.\n" +
 		"If you ever want to reinitiate your update, just type: *update*\n" +
-		"Let’s keep things short and crisp. Talk soon! 🙂`\n"
+		"Let’s keep things short and crisp. Talk soon! 🙂\n"
 )
