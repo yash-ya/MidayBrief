@@ -266,10 +266,18 @@ func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptS
 }
 
 func saveFinalPrompt(teamID, userID string, state utils.PromptState) {
-	final := fmt.Sprintf("Yesterday: %s\nToday: %s\nBlockers: %s",
-		state.Responses["yesterday"], state.Responses["today"], state.Responses["blockers"])
+	jsonResponse, err := json.Marshal(state.Responses)
+	if err != nil {
+		log.Printf("Failed to marshal prompt responses: %v", err)
+		return
+	}
 
-	encrypted, _ := utils.Encrypt(final)
+	encrypted, err := utils.Encrypt(string(jsonResponse))
+	if err != nil {
+		log.Printf("Failed to encrypt prompt response: %v", err)
+		return
+	}
+
 	if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
 		log.Printf("Failed to save final prompt message: %v", err)
 	}

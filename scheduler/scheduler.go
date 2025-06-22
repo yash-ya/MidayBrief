@@ -127,17 +127,38 @@ func formatSummary(messages []db.UserMessage) string {
 	userMap := make(map[string][]string)
 
 	for _, msg := range messages {
-		message, _ := utils.Decrypt(msg.Message)
-		userMap[msg.UserID] = append(userMap[msg.UserID], message)
+		userMap[msg.UserID] = append(userMap[msg.UserID], msg.Message)
 	}
 
 	var summary strings.Builder
-	summary.WriteString("Team Daily Standup Summary:\n")
+	summary.WriteString("📝 *Team Daily Standup Summary*\n\n")
 
-	for userID, updates := range userMap {
-		summary.WriteString(fmt.Sprintf("\n• <@%s>\n", userID))
-		for _, u := range updates {
-			summary.WriteString(fmt.Sprintf("   - %s\n", u))
+	for userID, encryptedMessages := range userMap {
+		summary.WriteString(fmt.Sprintf("• <@%s>\n", userID))
+
+		for _, enc := range encryptedMessages {
+			decrypted, err := utils.Decrypt(enc)
+			if err != nil {
+				log.Printf("Error decrypting message for user %s: %v", userID, err)
+				continue
+			}
+
+			var parsed map[string]string
+			if err := json.Unmarshal([]byte(decrypted), &parsed); err != nil {
+				summary.WriteString(fmt.Sprintf("   - %s\n", decrypted)) // fallback
+				continue
+			}
+
+			if y, ok := parsed["Yesterday"]; ok && y != "" {
+				summary.WriteString(fmt.Sprintf("   📌 *Yesterday:*\n      - %s\n", y))
+			}
+			if t, ok := parsed["Today"]; ok && t != "" {
+				summary.WriteString(fmt.Sprintf("   🎯 *Today:*\n      - %s\n", t))
+			}
+			if b, ok := parsed["Blockers"]; ok && b != "" {
+				summary.WriteString(fmt.Sprintf("   🚧 *Blockers:*\n      - %s\n", b))
+			}
+			summary.WriteString("\n")
 		}
 	}
 
