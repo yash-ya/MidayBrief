@@ -111,7 +111,7 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	welcomeMsg := fmt.Sprintf(slackWelcomeMessage, timezone)
+	welcomeMsg := fmt.Sprintf(slackWelcomeMessageForAdmin, timezone)
 	if err := SendMessage(oauthResp.AccessToken, oauthResp.AuthedUser.ID, welcomeMsg); err != nil {
 		log.Printf("[ERROR] Failed to send welcome message to admin %s: %v\n", oauthResp.AuthedUser.ID, err)
 	}

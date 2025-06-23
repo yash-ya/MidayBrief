@@ -107,7 +107,9 @@ func handleAddAllUsersConfig(team *db.TeamConfig, text string, updates, errors *
 			if !db.IsPromptUserExist(team.TeamID, userID) {
 				if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 					count++
-					go FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
+					if team.AdminUserID != userID {
+						go FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
+					}
 				} else {
 					log.Printf("[ERROR] Failed to add user %s to team %s: %v\n", userID, team.TeamID, err)
 				}
@@ -131,7 +133,9 @@ func handleAddUserConfig(team *db.TeamConfig, text string, updates, errors *[]st
 			if !db.IsPromptUserExist(team.TeamID, userID) {
 				if err := db.AddPromptUser(team.TeamID, userID); err == nil {
 					*updates = append(*updates, fmt.Sprintf("added <@%s>", userID))
-					go FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
+					if team.AdminUserID != userID {
+						go FireAndForgetDM(team.AccessToken, userID, slackUserWelcomeMessage)
+					}
 					log.Printf("[INFO] Added user %s to team %s\n", userID, team.TeamID)
 				} else {
 					*errors = append(*errors, fmt.Sprintf("Couldn’t add <@%s> due to a system error.", userID))
@@ -198,7 +202,7 @@ func sendCombinedConfigResponse(channel, token string, updates, errors []string)
 	var response strings.Builder
 
 	if len(updates) > 0 {
-		response.WriteString("✅ *Here’s what I updated:*\n")
+		response.WriteString("✅ *Here's what I updated:*\n")
 		for _, u := range updates {
 			response.WriteString("• " + u + "\n")
 		}
@@ -212,14 +216,7 @@ func sendCombinedConfigResponse(channel, token string, updates, errors []string)
 	}
 
 	if response.Len() == 0 {
-		response.WriteString("Hmm... I couldn't recognize any valid configuration updates. 🤔\n")
-		response.WriteString("Try commands like:\n")
-		response.WriteString("• `config #channel`\n")
-		response.WriteString("• `post time 17:00`\n")
-		response.WriteString("• `prompt time 10:00`\n")
-		response.WriteString("• `timezone Asia/Kolkata`\n")
-		response.WriteString("• `add all users`\n")
-		response.WriteString("• `add/remove @user`\n")
+		response.WriteString(unrecognizedCommandMessage)
 	}
 
 	SendMessage(token, channel, response.String())

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
@@ -61,14 +62,40 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 
 	if isConfig(event.Event.Text) {
 		handleCombinedConfig(event, team)
-	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "update") && !utils.CanUpdateNow(team.PostTime, team.Timezone) {
-		SendMessage(team.AccessToken, event.Event.Channel, "You're too close to the posting time. Updates are only allowed until 30 minutes before the summary is posted.")
-		return
+	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "update") {
+		if !utils.CanUpdateNow(team.PostTime, team.Timezone) {
+			SendMessage(team.AccessToken, event.Event.Channel, "You're too close to the posting time. Updates are only allowed until 30 minutes before the summary is posted.")
+			return
+		} else {
+			startPromptTime(event.Event.User, team.TeamID, team.AccessToken)
+		}
 	} else {
 		handleUserMessage(event, team)
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func startPromptTime(userID, teamID, accessToken string) {
+	state := utils.PromptState{
+		Step:      1,
+		Responses: make(map[string]string),
+		StartedAt: time.Now().UTC(),
+	}
+
+	if err := utils.SetPromptState(teamID, userID, state, context.Background()); err != nil {
+		log.Printf("[ERROR] Failed to set prompt state for user %s in team %s: %v", userID, teamID, err)
+		return
+	}
+
+	if err := utils.SetPromptExpiry(teamID, userID, promptSessionDuration, context.Background()); err != nil {
+		log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", userID, teamID, err)
+		return
+	}
+
+	if err := SendMessage(accessToken, userID, updatePromptMessage); err != nil {
+		log.Printf("[ERROR] Failed to send prompt to user %s in team %s: %v", userID, teamID, err)
+	}
 }
 
 func isConfig(text string) bool {
