@@ -135,13 +135,18 @@ func getUserTimeZone(accessToken, userID string) (string, error) {
 	return result.User.TZ, nil
 }
 
-func getAllTeamUsers(token string) ([]string, error) {
+func getAllTeamUsers(accessToken string) ([]string, error) {
+	decryptedAccessToken, err := utils.Decrypt(accessToken)
+	if err != nil {
+		log.Printf("[WARN] Failed to decrypt access token, using fallback: %v\n", err)
+		decryptedAccessToken = accessToken
+	}
 	req, err := http.NewRequest("GET", slackUsersListURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+decryptedAccessToken)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
