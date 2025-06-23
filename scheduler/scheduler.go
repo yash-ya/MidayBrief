@@ -12,10 +12,15 @@ import (
 	"time"
 )
 
-const promptMessage = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
+const (
+	promptMessage         = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
+	schedulerInterval     = 1 * time.Minute
+	checkExpiredTimeout   = 30 * time.Second // Increased timeout for expired prompt check
+	promptSessionDuration = 4 * time.Hour    // Example: prompt session expires after 4 hours if not completed
+)
 
 func StartScheduler() {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(schedulerInterval)
 	defer ticker.Stop()
 
 	log.Println("[INFO] Scheduler started...")
@@ -34,12 +39,13 @@ func processSchedule(now time.Time) {
 
 	for _, team := range teams {
 		if team.PostTime == "" || team.PromptTime == "" || team.Timezone == "" || team.ChannelID == "" {
+			log.Printf("[WARN] Skipping team %s due to incomplete configuration.", team.TeamID)
 			continue
 		}
 
 		loc, err := time.LoadLocation(team.Timezone)
 		if err != nil {
-			log.Printf("[WARN] Invalid timezone for team %s: %s", team.TeamID, team.Timezone)
+			log.Printf("[WARN] Invalid timezone for team %s: %s - %v", team.TeamID, team.Timezone, err)
 			continue
 		}
 
@@ -47,33 +53,30 @@ func processSchedule(now time.Time) {
 		formatted := localTime.Format("15:04")
 
 		if formatted == team.PromptTime {
-			log.Printf("[INFO] Triggering prompt for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
+			log.Printf("[INFO] Triggering prompt for team %s at %s (%s)", team.TeamID, localTime.Format("15:04:05"), team.Timezone)
 			go triggerPromptForTeam(team)
 		}
 
 		if formatted == team.PostTime {
-			log.Printf("[INFO] Triggering post summary for team %s at %s (%s)", team.TeamID, localTime, team.Timezone)
+			log.Printf("[INFO] Triggering post summary for team %s at %s (%s)", team.TeamID, localTime.Format("15:04:05"), team.Timezone)
 			go postSummaryForTeam(team, loc)
-
-			if err := db.CleanupMessages(team.TeamID); err != nil {
-				log.Printf("[ERROR] Failed to clean messages for team %s: %v", team.TeamID, err)
-			}
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), checkExpiredTimeout)
 	defer cancel()
 	checkExpiredPrompts(ctx)
 }
 
 func checkExpiredPrompts(ctx context.Context) {
-	/// log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
+	// log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
 
 	var cursor uint64
 	for {
+		// Use a specific pattern to only scan for prompt expiry keys
 		keys, newCursor, err := utils.RedisClient.Scan(ctx, cursor, "prompt_expiry:*", 100).Result()
 		if err != nil {
-			log.Printf("[ERROR] Redis SCAN failed: %v", err)
+			log.Printf("[ERROR] Redis SCAN failed for expired prompts: %v", err)
 			break
 		}
 		cursor = newCursor
@@ -81,28 +84,46 @@ func checkExpiredPrompts(ctx context.Context) {
 		for _, key := range keys {
 			ttl, err := utils.RedisClient.TTL(ctx, key).Result()
 			if err != nil {
-				log.Printf("[ERROR] Failed to get TTL for key %s: %v", key, err)
+				log.Printf("[ERROR] Failed to get TTL for key %s during expiry check: %v", key, err)
 				continue
 			}
-			if ttl > 0 {
+
+			// Only process keys that have effectively expired or have no TTL set
+			if ttl > 0 && ttl != -1 { // -1 means no expiry, 0 means expired
 				continue
 			}
 
 			parts := strings.Split(key, ":")
 			if len(parts) != 3 {
-				log.Printf("[WARN] Invalid key format: %s", key)
+				log.Printf("[WARN] Invalid prompt expiry key format: %s", key)
+				// Consider deleting malformed keys if they are not expected
+				_ = utils.RedisClient.Del(ctx, key).Err()
 				continue
 			}
 			teamID, userID := parts[1], parts[2]
 
 			state, err := utils.GetPromptState(teamID, userID, ctx)
-			if err == nil && state.Step < 4 {
-				log.Printf("[WARN] Prompt session expired for user %s in team %s", userID, teamID)
-				api.SendMessage(teamID, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
+			if err != nil {
+				// If prompt state doesn't exist, but expiry key does, it's stale. Delete both.
+				log.Printf("[INFO] Stale prompt expiry key found for user %s in team %s. Deleting.", userID, teamID)
+				_ = utils.RedisClient.Del(ctx, key).Err()
+				continue
 			}
 
-			_ = utils.RedisClient.Del(ctx, key).Err()
-			_ = utils.DeletePromptState(teamID, userID, ctx)
+			if state.Step < 4 { // Prompt session is incomplete and has expired
+				log.Printf("[INFO] Prompt session expired for user %s in team %s (Step: %d). Notifying user and cleaning up.", userID, teamID, state.Step)
+				api.SendMessage(teamID, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
+			} else {
+				// Prompt session is complete (Step >= 4), but the expiry key is still present and expired. Clean up.
+				log.Printf("[INFO] Prompt session for user %s in team %s completed (Step: %d), but expiry key was still present and expired. Cleaning up.", userID, teamID, state.Step)
+			}
+			// Always clean up the expiry key and prompt state if found during an expired scan
+			if err := utils.RedisClient.Del(ctx, key).Err(); err != nil {
+				log.Printf("[ERROR] Failed to delete expired prompt key %s: %v", key, err)
+			}
+			if err := utils.DeletePromptState(teamID, userID, ctx); err != nil {
+				log.Printf("[ERROR] Failed to delete prompt state for user %s in team %s: %v", userID, teamID, err)
+			}
 		}
 
 		if cursor == 0 {
@@ -129,21 +150,25 @@ func triggerPromptForTeam(team db.TeamConfig) {
 		}
 
 		if err := utils.SetPromptState(team.TeamID, user.UserID, state, ctx); err != nil {
-			log.Printf("[ERROR] Failed to set prompt state for user %s: %v", user.UserID, err)
+			log.Printf("[ERROR] Failed to set prompt state for user %s in team %s: %v", user.UserID, team.TeamID, err)
 			continue
 		}
 
-		_ = utils.SetPromptExpiry(team.TeamID, user.UserID, ctx)
+		// Ensure that the expiry is set, handle the error
+		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, promptSessionDuration, ctx); err != nil {
+			log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", user.UserID, team.TeamID, err)
+			continue
+		}
 
 		if err := api.SendMessage(team.AccessToken, user.UserID, promptMessage); err != nil {
-			log.Printf("[ERROR] Failed to send prompt to user %s: %v", user.UserID, err)
+			log.Printf("[ERROR] Failed to send prompt to user %s in team %s: %v", user.UserID, team.TeamID, err)
 		}
 	}
 }
 
 func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 	if team.AccessToken == "" || team.ChannelID == "" {
-		log.Printf("[ERROR] Missing credentials for team %s", team.TeamID)
+		log.Printf("[ERROR] Missing access token or channel ID for team %s. Cannot post summary.", team.TeamID)
 		return
 	}
 
@@ -154,13 +179,17 @@ func postSummaryForTeam(team db.TeamConfig, location *time.Location) {
 	}
 
 	if len(messages) == 0 {
-		log.Printf("[INFO] No messages found for team %s", team.TeamID)
+		log.Printf("[INFO] No messages found for team %s to summarize.", team.TeamID)
 		return
 	}
 
 	summary := formatSummary(messages)
 	if err := api.SendMessage(team.AccessToken, team.ChannelID, summary); err != nil {
-		log.Printf("[ERROR] Failed to post summary for team %s: %v", team.TeamID, err)
+		log.Printf("[ERROR] Failed to post summary for team %s to channel %s: %v", team.TeamID, team.ChannelID, err)
+	}
+
+	if err := db.CleanupMessages(team.TeamID); err != nil {
+		log.Printf("[ERROR] Failed to clean messages for team %s after posting summary: %v", team.TeamID, err)
 	}
 }
 
@@ -186,19 +215,19 @@ func formatSummary(messages []db.UserMessage) string {
 
 			var parsed map[string]string
 			if err := json.Unmarshal([]byte(decrypted), &parsed); err != nil {
-				log.Printf("[WARN] Fallback to raw message for user %s", userID)
-				summary.WriteString(fmt.Sprintf("   - %s\n", decrypted))
+				log.Printf("[WARN] Failed to unmarshal message for user %s. Falling back to raw message: %s", userID, decrypted)
+				summary.WriteString(fmt.Sprintf("   - %s\n", decrypted))
 				continue
 			}
 
 			if y, ok := parsed["Yesterday"]; ok && y != "" {
-				summary.WriteString(fmt.Sprintf("   📌 *Yesterday:*\n      - %s\n", y))
+				summary.WriteString(fmt.Sprintf("   📌 *Yesterday:*\n      - %s\n", y))
 			}
 			if t, ok := parsed["Today"]; ok && t != "" {
-				summary.WriteString(fmt.Sprintf("   🎯 *Today:*\n      - %s\n", t))
+				summary.WriteString(fmt.Sprintf("   🎯 *Today:*\n      - %s\n", t))
 			}
 			if b, ok := parsed["Blockers"]; ok && b != "" {
-				summary.WriteString(fmt.Sprintf("   🚧 *Blockers:*\n      - %s\n", b))
+				summary.WriteString(fmt.Sprintf("   🚧 *Blockers:*\n      - %s\n", b))
 			}
 			summary.WriteString("\n")
 		}

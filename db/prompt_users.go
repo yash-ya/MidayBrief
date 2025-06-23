@@ -47,3 +47,11 @@ func GetAllPromptUser(teamID string) ([]PromptUser, error) {
 	log.Printf("[INFO] GetAllPromptUser: fetched %d users for team %s\n", len(users), teamID)
 	return users, nil
 }
+
+func IsPromptUserExist(teamID, userID string) bool {
+	var count int64
+	DB.Model(&PromptUser{}).Where("team_id = ? AND user_id = ?", teamID, userID).Count(&count)
+
+	log.Printf("[INFO] IsPromptUserExist: %s user already exists for team %s", userID, teamID)
+	return count > 0
+}
