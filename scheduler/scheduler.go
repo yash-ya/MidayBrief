@@ -111,8 +111,12 @@ func checkExpiredPrompts(ctx context.Context) {
 			}
 
 			if state.Step < 4 { // Prompt session is incomplete and has expired
+				team, err := db.GetTeamConfig(teamID)
+				if err != nil {
+					log.Printf("[ERROR] Team config fetch failed for team %s: %v\n", teamID, err)
+				}
 				log.Printf("[INFO] Prompt session expired for user %s in team %s (Step: %d). Notifying user and cleaning up.", userID, teamID, state.Step)
-				api.SendMessage(teamID, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
+				api.SendMessage(team.AccessToken, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
 			} else {
 				// Prompt session is complete (Step >= 4), but the expiry key is still present and expired. Clean up.
 				log.Printf("[INFO] Prompt session for user %s in team %s completed (Step: %d), but expiry key was still present and expired. Cleaning up.", userID, teamID, state.Step)
