@@ -208,6 +208,7 @@ func formatSummary(messages []db.UserMessage) string {
 
 		for _, enc := range encryptedMessages {
 			decrypted, err := utils.Decrypt(enc)
+			log.Printf("[INFO] User Message %s", decrypted)
 			if err != nil {
 				log.Printf("[ERROR] Error decrypting message for user %s: %v", userID, err)
 				continue
