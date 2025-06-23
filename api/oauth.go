@@ -91,7 +91,7 @@ func HandleSlackOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		encryptedToken = oauthResp.AccessToken
 	}
 
-	timezone, err := getUserTimeZone(oauthResp.AccessToken, oauthResp.AuthedUser.ID)
+	timezone, err := getUserTimeZone(encryptedToken, oauthResp.AuthedUser.ID)
 	if err != nil {
 		log.Printf("[WARN] Could not fetch user timezone: %v. Defaulting to UTC\n", err)
 		timezone = "UTC"

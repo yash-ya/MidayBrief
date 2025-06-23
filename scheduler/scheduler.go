@@ -16,7 +16,7 @@ const (
 	promptMessage         = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
 	schedulerInterval     = 1 * time.Minute
 	checkExpiredTimeout   = 30 * time.Second // Increased timeout for expired prompt check
-	promptSessionDuration = 15 * time.Hour   // Example: prompt session expires after 4 hours if not completed
+	promptSessionDuration = 15 * time.Minute // Example: prompt session expires after 4 hours if not completed
 )
 
 func StartScheduler() {
