@@ -54,22 +54,32 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	if state, err := utils.GetPromptState(team.TeamID, event.Event.User, ctx); err == nil && state != nil {
-		handlePromptStep(event, team, *state, ctx)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
+	state, err := utils.GetPromptState(team.TeamID, event.Event.User, ctx)
 
-	if isConfig(event.Event.Text) {
-		handleCombinedConfig(event, team)
-	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "update") {
+	text := strings.ToLower(strings.TrimSpace(event.Event.Text))
+	if text == "update" {
 		if !utils.CanUpdateNow(team.PostTime, team.Timezone) {
 			SendMessage(team.AccessToken, event.Event.Channel, userUpdateCommandRestrict)
-			return
+		} else if state != nil {
+			promptProgressMessage := utils.GetPromptProgressMessage(*state)
+			SendMessage(team.AccessToken, event.Event.Channel, promptProgressMessage)
 		} else {
+			isLimited, err := utils.IsRateLimited(team.TeamID, event.Event.User, "update", 2*time.Minute, ctx)
+			if err != nil {
+				log.Printf("[ERROR] Rate limit check failed for %s: %v\n", event.Event.User, err)
+			}
+			if isLimited {
+				SendMessage(team.AccessToken, event.Event.Channel, slackRateLimitingMessage)
+				return
+			}
+
 			startPromptTime(event.Event.User, team.TeamID, team.AccessToken)
 		}
-	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "help") {
+	} else if err == nil && state != nil {
+		handlePromptStep(event, team, *state, ctx)
+	} else if isConfig(event.Event.Text) {
+		handleCombinedConfig(event, team)
+	} else if strings.HasPrefix(text, "help") {
 		SendMessage(team.AccessToken, event.Event.Channel, slackUserHelpMessage)
 	} else {
 		SendMessage(team.AccessToken, event.Event.Channel, slackUnrecognizedCommandMessage)
@@ -85,12 +95,13 @@ func startPromptTime(userID, teamID, accessToken string) {
 		StartedAt: time.Now().UTC(),
 	}
 
-	if err := utils.SetPromptState(teamID, userID, state, context.Background()); err != nil {
+	ctx := context.Background()
+	if err := utils.SetPromptState(teamID, userID, state, ctx); err != nil {
 		log.Printf("[ERROR] Failed to set prompt state for user %s in team %s: %v", userID, teamID, err)
 		return
 	}
 
-	if err := utils.SetPromptExpiry(teamID, userID, promptSessionDuration, context.Background()); err != nil {
+	if err := utils.SetPromptExpiry(teamID, userID, promptSessionDuration, ctx); err != nil {
 		log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", userID, teamID, err)
 		return
 	}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"gorm.io/gorm/clause"
 )
 
 func SaveUserMessage(teamID, userID, text string) error {
@@ -15,8 +17,19 @@ func SaveUserMessage(teamID, userID, text string) error {
 		Timestamp:   time.Now().UTC(),
 		MessageHash: utils.Hash(text),
 	}
+	err := DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "team_id"},
+			{Name: "user_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"message",
+			"timestamp",
+			"message_hash",
+		}),
+	}).Create(&message).Error
 
-	if err := DB.Create(&message).Error; err != nil {
+	if err != nil {
 		log.Printf("[ERROR] SaveUserMessage: failed to save message for team %s, user %s: %v\n", teamID, userID, err)
 		return fmt.Errorf("SaveUserMessage: failed to save message: %w", err)
 	}

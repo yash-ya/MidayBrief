@@ -59,4 +59,5 @@ const (
 		"I'll send you daily prompts to share your updates. It's super simple!\n" +
 		"• You'll get questions about what you did yesterday, what's on your plate today, and any blockers.\n" +
 		"• If your session ever expires or you need to resubmit, just type `update` to start a fresh update."
+	slackRateLimitingMessage = "🕒 You're going too fast! Please wait 2 minutes before updating again."
 )
