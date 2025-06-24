@@ -113,22 +113,6 @@ func isConfig(text string) bool {
 	return isConfig || isPostTime || isTimezone || isPromptTime || isAddAll || isAddUser || isRemoveUser
 }
 
-func handleUserMessage(event SlackEvent, team *db.TeamConfig) {
-	hash := utils.Hash(event.Event.Text)
-	if db.IsDuplicateMessage(event.TeamID, event.Event.User, hash, team.Timezone) {
-		SendMessage(team.AccessToken, event.Event.Channel, "Looks like you've already sent this update today.")
-		return
-	}
-
-	encryptedMessage, _ := utils.Encrypt(event.Event.Text)
-	if err := db.SaveUserMessage(event.TeamID, event.Event.User, encryptedMessage); err != nil {
-		log.Printf("[ERROR] Failed to save user message: %v\n", err)
-	} else {
-		log.Printf("[INFO] Saved user message for team %s, user %s\n", event.TeamID, event.Event.User)
-		SendMessage(team.AccessToken, event.Event.Channel, "Got your update for today!")
-	}
-}
-
 func handlePromptStep(event SlackEvent, team *db.TeamConfig, state utils.PromptState, ctx context.Context) {
 	userID := event.Event.User
 	teamID := team.TeamID
