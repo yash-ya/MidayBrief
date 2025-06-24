@@ -25,6 +25,25 @@ func SaveUserMessage(teamID, userID, text string) error {
 	return nil
 }
 
+func UpdateUserMessage(teamID, userID, message string) error {
+	now := time.Now().UTC()
+	err := DB.Model(&UserMessage{}).
+		Where("team_id = ? AND user_id = ?", teamID, userID).
+		Updates(map[string]any{
+			"message":      message,
+			"timestamp":    now,
+			"message_hash": utils.Hash(message),
+		}).Error
+
+	if err != nil {
+		log.Printf("[ERROR] UpdateUserMessage: failed to update user message for user %s and team %s: %v\n", userID, teamID, err)
+		return fmt.Errorf("UpdateUserMessage: failed to update the stand up update %s: %w", teamID, err)
+	}
+
+	log.Printf("[INFO] UpdateUserMessage: updated user %s standup update for team %s\n", userID, teamID)
+	return nil
+}
+
 func GetMessagesForTeamToday(teamID string, location *time.Location) ([]UserMessage, error) {
 	var messages []UserMessage
 	err := DB.Where("team_id = ?", teamID).Find(&messages).Error
@@ -45,6 +64,13 @@ func CleanupMessages(teamID string) error {
 	}
 	log.Printf("[INFO] Cleaned up messages for team %s\n", teamID)
 	return nil
+}
+
+func IsUserMessageExist(teamID, userID string) bool {
+	var count int64
+	DB.Model(&UserMessage{}).Where("team_id = ? AND user_id = ?", teamID, userID).Count(&count)
+	log.Printf("[INFO] User message exist check for user %s in team %s: %t\n", userID, teamID, count > 0)
+	return count > 0
 }
 
 func IsDuplicateMessage(teamID, userID, hash, timezone string) bool {

@@ -227,7 +227,7 @@ func sendCombinedConfigResponse(channel, token string, updates, errors []string)
 	}
 
 	if response.Len() == 0 {
-		response.WriteString(unrecognizedCommandMessage)
+		response.WriteString(slackUnrecognizedCommandMessage)
 	}
 
 	SendMessage(token, channel, response.String())

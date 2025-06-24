@@ -64,13 +64,15 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		handleCombinedConfig(event, team)
 	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "update") {
 		if !utils.CanUpdateNow(team.PostTime, team.Timezone) {
-			SendMessage(team.AccessToken, event.Event.Channel, "You're too close to the posting time. Updates are only allowed until 30 minutes before the summary is posted.")
+			SendMessage(team.AccessToken, event.Event.Channel, userUpdateCommandRestrict)
 			return
 		} else {
 			startPromptTime(event.Event.User, team.TeamID, team.AccessToken)
 		}
+	} else if strings.HasPrefix(strings.ToLower(strings.TrimSpace(event.Event.Text)), "help") {
+		SendMessage(team.AccessToken, event.Event.Channel, slackUserHelpMessage)
 	} else {
-		handleUserMessage(event, team)
+		SendMessage(team.AccessToken, event.Event.Channel, slackUnrecognizedCommandMessage)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -93,7 +95,7 @@ func startPromptTime(userID, teamID, accessToken string) {
 		return
 	}
 
-	if err := SendMessage(accessToken, userID, updatePromptMessage); err != nil {
+	if err := SendMessage(accessToken, userID, slackUpdatePromptMessage); err != nil {
 		log.Printf("[ERROR] Failed to send prompt to user %s in team %s: %v", userID, teamID, err)
 	}
 }
@@ -169,7 +171,13 @@ func saveFinalPrompt(teamID, userID string, state utils.PromptState) {
 		return
 	}
 
-	if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
-		log.Printf("[ERROR] Failed to save encrypted prompt response: %v\n", err)
+	if !db.IsUserMessageExist(teamID, userID) {
+		if err := db.SaveUserMessage(teamID, userID, encrypted); err != nil {
+			log.Printf("[ERROR] Failed to save encrypted prompt response: %v\n", err)
+		}
+	} else {
+		if err := db.UpdateUserMessage(teamID, userID, encrypted); err != nil {
+			log.Printf("[ERROR] Failed to save updated encrypted prompt response: %v\n", err)
+		}
 	}
 }

@@ -16,7 +16,7 @@ const (
 	promptMessage         = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
 	schedulerInterval     = 1 * time.Minute
 	checkExpiredTimeout   = 30 * time.Second // Increased timeout for expired prompt check
-	promptSessionDuration = 15 * time.Minute // Example: prompt session expires after 4 hours if not completed
+	promptSessionDuration = 30 * time.Minute // Example: prompt session expires after 30 minutes if not completed
 )
 
 func StartScheduler() {
@@ -69,11 +69,8 @@ func processSchedule(now time.Time) {
 }
 
 func checkExpiredPrompts(ctx context.Context) {
-	// log.Printf("[INFO] Checking expired prompt sessions at %s", time.Now().Format(time.RFC3339))
-
 	var cursor uint64
 	for {
-		// Use a specific pattern to only scan for prompt expiry keys
 		keys, newCursor, err := utils.RedisClient.Scan(ctx, cursor, "prompt_expiry:*", 100).Result()
 		if err != nil {
 			log.Printf("[ERROR] Redis SCAN failed for expired prompts: %v", err)
@@ -88,15 +85,13 @@ func checkExpiredPrompts(ctx context.Context) {
 				continue
 			}
 
-			// Only process keys that have effectively expired or have no TTL set
-			if ttl > 0 && ttl != -1 { // -1 means no expiry, 0 means expired
+			if ttl > 0 && ttl != -1 {
 				continue
 			}
 
 			parts := strings.Split(key, ":")
 			if len(parts) != 3 {
 				log.Printf("[WARN] Invalid prompt expiry key format: %s", key)
-				// Consider deleting malformed keys if they are not expected
 				_ = utils.RedisClient.Del(ctx, key).Err()
 				continue
 			}
@@ -104,13 +99,12 @@ func checkExpiredPrompts(ctx context.Context) {
 
 			state, err := utils.GetPromptState(teamID, userID, ctx)
 			if err != nil {
-				// If prompt state doesn't exist, but expiry key does, it's stale. Delete both.
 				log.Printf("[INFO] Stale prompt expiry key found for user %s in team %s. Deleting.", userID, teamID)
 				_ = utils.RedisClient.Del(ctx, key).Err()
 				continue
 			}
 
-			if state.Step < 4 { // Prompt session is incomplete and has expired
+			if state.Step < 4 {
 				team, err := db.GetTeamConfig(teamID)
 				if err != nil {
 					log.Printf("[ERROR] Team config fetch failed for team %s: %v\n", teamID, err)
@@ -118,10 +112,8 @@ func checkExpiredPrompts(ctx context.Context) {
 				log.Printf("[INFO] Prompt session expired for user %s in team %s (Step: %d). Notifying user and cleaning up.", userID, teamID, state.Step)
 				api.SendMessage(team.AccessToken, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
 			} else {
-				// Prompt session is complete (Step >= 4), but the expiry key is still present and expired. Clean up.
 				log.Printf("[INFO] Prompt session for user %s in team %s completed (Step: %d), but expiry key was still present and expired. Cleaning up.", userID, teamID, state.Step)
 			}
-			// Always clean up the expiry key and prompt state if found during an expired scan
 			if err := utils.RedisClient.Del(ctx, key).Err(); err != nil {
 				log.Printf("[ERROR] Failed to delete expired prompt key %s: %v", key, err)
 			}
@@ -158,7 +150,6 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		// Ensure that the expiry is set, handle the error
 		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, promptSessionDuration, ctx); err != nil {
 			log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", user.UserID, team.TeamID, err)
 			continue

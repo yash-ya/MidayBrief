@@ -43,6 +43,20 @@ const (
 		"At the scheduled post time, I'll compile everyone's responses and share the team summary in the standup channel.\n" +
 		"If you ever want to reinitiate your update (e.g., if you were interrupted or your session expired), just type: *update*.\n" +
 		"Let's keep things short and crisp. Talk soon! 🙂"
-	unrecognizedCommandMessage = "Oops! I couldn't quite figure out what you meant. 🤔 It looks like that command isn't in my playbook.\n\n Try commands like `config #your-channel` or `post time 17:00`. \n\nFor a full list of commands, just type `help`!"
-	updatePromptMessage        = "Alright, let's get a fresh update started! 👋\n\nWe'll begin with the first question:\n\n🕐 *What did you work on yesterday?*\nFeel free to share your key highlights or any progress you made."
+	slackUnrecognizedCommandMessage = "Oops! I couldn't quite figure out what you meant. 🤔 It looks like that command isn't in my playbook.\n\n Try commands like `config #your-channel` or `post time 17:00`. \n\nFor a full list of commands, just type `help`!"
+	slackUpdatePromptMessage        = "Alright, let's get a fresh update started! 👋\n\nWe'll begin with the first question:\n\n🕐 *What did you work on yesterday?*\nFeel free to share your key highlights or any progress you made."
+	userUpdateCommandRestrict       = "You're too close to the posting time. Updates are only allowed until 30 minutes before the summary is posted."
+	slackUserHelpMessage            = "Hey there! I'm *MidayBrief*, your daily standup assistant. Here's a quick guide on how to use me:\n\n" +
+		"*If you're an Admin:*\n" +
+		"You have the power to set things up for your team! Here are some commands you can use:\n" +
+		"• `config #your-channel`: Sets the channel for daily summary posts.\n" +
+		"• `post time HH:MM`: Sets the time I'll post the daily summary (e.g., `17:00`).\n" +
+		"• `prompt time HH:MM`: Sets the time I'll ask for daily updates (e.g., `10:00`).\n" +
+		"• `timezone Region/City`: Sets your team's timezone (e.g., `Asia/Kolkata`).\n" +
+		"• `add all users`: Adds everyone in this channel to standup prompts.\n" +
+		"• `add user @username` or `remove user @username`: Manages individual users for prompts.\n\n" +
+		"*If you're a Team Member:*\n" +
+		"I'll send you daily prompts to share your updates. It's super simple!\n" +
+		"• You'll get questions about what you did yesterday, what's on your plate today, and any blockers.\n" +
+		"• If your session ever expires or you need to resubmit, just type `update` to start a fresh update."
 )
