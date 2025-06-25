@@ -45,3 +45,27 @@ type SlackEventData struct {
 type Commands struct {
 	Operation []string
 }
+
+type MessageResponse struct {
+	Ok      bool    `json:"ok"`
+	Error   string  `json:"error"`
+	Channel string  `json:"channel"`
+	Ts      string  `json:"ts"`
+	Message Message `json:"message"`
+}
+
+type Message struct {
+	Text        string       `json:"text"`
+	Username    string       `json:"username"`
+	BotID       string       `json:"bot_id"`
+	Attachments []Attachment `json:"attachments"`
+	Type        string       `json:"type"`
+	Subtype     string       `json:"subtype"`
+	Ts          string       `json:"ts"`
+}
+
+type Attachment struct {
+	Text     string `json:"text"`
+	ID       int64  `json:"id"`
+	Fallback string `json:"fallback"`
+}

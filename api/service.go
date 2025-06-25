@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -40,12 +41,12 @@ func SendMessageWithContext(ctx context.Context, accessToken, userChannel, messa
 		"text":    message,
 	}
 
-	body, err := json.Marshal(payload)
+	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal message: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", slackPostMessagesURL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", slackPostMessagesURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -57,10 +58,21 @@ func SendMessageWithContext(ctx context.Context, accessToken, userChannel, messa
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[ERROR] Failed to read SlackMessage response body: %v\n", err)
+		return fmt.Errorf("failed to read SlackMessage response body: %v", err)
+	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("slack returned status: %s", resp.Status)
+	var messageResponse MessageResponse
+	if err := json.Unmarshal(responseBody, &messageResponse); err != nil {
+		log.Printf("[ERROR] Failed to unmarshal OAuth response: %v\n", err)
+	}
+
+	if !messageResponse.Ok {
+		log.Printf("[ERROR] Message response returned error: %s\n", messageResponse.Error)
+		return fmt.Errorf("message response returned error: %s", messageResponse.Error)
 	}
 
 	return nil

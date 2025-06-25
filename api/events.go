@@ -79,7 +79,7 @@ func HandleSlackEvents(w http.ResponseWriter, r *http.Request) {
 		handlePromptStep(event, team, *state, ctx)
 	} else if isConfig(event.Event.Text) {
 		handleCombinedConfig(event, team)
-	} else if strings.HasPrefix(text, "help") {
+	} else if text == "help" {
 		SendMessage(team.AccessToken, event.Event.Channel, slackUserHelpMessage)
 	} else {
 		SendMessage(team.AccessToken, event.Event.Channel, slackUnrecognizedCommandMessage)
@@ -101,7 +101,7 @@ func startPromptTime(userID, teamID, accessToken string) {
 		return
 	}
 
-	if err := utils.SetPromptExpiry(teamID, userID, ctx); err != nil {
+	if err := utils.SetPromptExpiry(teamID, userID, accessToken, ctx); err != nil {
 		log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", userID, teamID, err)
 		return
 	}

@@ -52,8 +52,8 @@ func SetPromptState(teamID, userID string, state PromptState, ctx context.Contex
 	return nil
 }
 
-func SetPromptExpiry(teamID, userID string, ctx context.Context) error {
-	key := fmt.Sprintf("prompt_expiry:%s:%s", teamID, userID)
+func SetPromptExpiry(teamID, userID, accessToken string, ctx context.Context) error {
+	key := fmt.Sprintf("prompt_expiry:%s:%s:%s", teamID, userID, accessToken)
 	if err := RedisClient.Set(ctx, key, "active", promptTTL*time.Minute).Err(); err != nil {
 		log.Printf("[ERROR] SetPromptExpiry: Redis set failed for key %s: %v\n", key, err)
 		return err

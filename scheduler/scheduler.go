@@ -95,7 +95,7 @@ func checkExpiredPrompts(ctx context.Context) {
 				_ = utils.RedisClient.Del(ctx, key).Err()
 				continue
 			}
-			teamID, userID := parts[1], parts[2]
+			teamID, userID, accessToken := parts[1], parts[2], parts[3]
 
 			state, err := utils.GetPromptState(teamID, userID, ctx)
 			if err != nil {
@@ -105,13 +105,9 @@ func checkExpiredPrompts(ctx context.Context) {
 			}
 
 			if state.Step < 4 {
-				team, err := db.GetTeamConfig(teamID)
-				if err != nil {
-					log.Printf("[ERROR] Team config fetch failed for team %s: %v\n", teamID, err)
-				}
 				log.Printf("[INFO] Prompt session expired for user %s in team %s (Step: %d). Notifying user and cleaning up.", userID, teamID, state.Step)
-				if err := api.SendMessage(team.AccessToken, userID, promptMessage); err != nil {
-					log.Printf("[ERROR] Failed to send prompt expiration message to user %s in team %s: %v", userID, team.TeamID, err)
+				if err := api.SendMessage(accessToken, userID, promptMessage); err != nil {
+					log.Printf("[ERROR] Failed to send prompt expiration message to user %s in team %s: %v", userID, teamID, err)
 				}
 			} else {
 				log.Printf("[INFO] Prompt session for user %s in team %s completed (Step: %d), but expiry key was still present and expired. Cleaning up.", userID, teamID, state.Step)
@@ -152,7 +148,7 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, ctx); err != nil {
+		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, team.AccessToken, ctx); err != nil {
 			log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", user.UserID, team.TeamID, err)
 			continue
 		}
