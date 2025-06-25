@@ -101,7 +101,7 @@ func startPromptTime(userID, teamID, accessToken string) {
 		return
 	}
 
-	if err := utils.SetPromptExpiry(teamID, userID, promptSessionDuration, ctx); err != nil {
+	if err := utils.SetPromptExpiry(teamID, userID, ctx); err != nil {
 		log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", userID, teamID, err)
 		return
 	}

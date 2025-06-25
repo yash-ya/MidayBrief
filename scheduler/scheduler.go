@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	promptMessage         = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
-	schedulerInterval     = 1 * time.Minute
-	checkExpiredTimeout   = 30 * time.Second // Increased timeout for expired prompt check
-	promptSessionDuration = 30 * time.Minute // Example: prompt session expires after 30 minutes if not completed
+	promptMessage                  = "Good day! 👋\n\nHope you're doing well. Let's kick off your daily standup.\n\n🕐 First up — *What did you work on yesterday?*\nFeel free to share key highlights or any progress you made."
+	schedulerInterval              = 1 * time.Minute
+	checkExpiredTimeout            = 30 * time.Second // Increased timeout for expired prompt check
+	promptSessionExpirationMessage = "⏰ Your prompt session expired. To submit your update, reply with `update` again."
 )
 
 func StartScheduler() {
@@ -110,7 +110,9 @@ func checkExpiredPrompts(ctx context.Context) {
 					log.Printf("[ERROR] Team config fetch failed for team %s: %v\n", teamID, err)
 				}
 				log.Printf("[INFO] Prompt session expired for user %s in team %s (Step: %d). Notifying user and cleaning up.", userID, teamID, state.Step)
-				api.SendMessage(team.AccessToken, userID, "⏰ Your prompt session expired. To submit your update, reply with `update` again.")
+				if err := api.SendMessage(team.AccessToken, userID, promptMessage); err != nil {
+					log.Printf("[ERROR] Failed to send prompt expiration message to user %s in team %s: %v", userID, team.TeamID, err)
+				}
 			} else {
 				log.Printf("[INFO] Prompt session for user %s in team %s completed (Step: %d), but expiry key was still present and expired. Cleaning up.", userID, teamID, state.Step)
 			}
@@ -150,7 +152,7 @@ func triggerPromptForTeam(team db.TeamConfig) {
 			continue
 		}
 
-		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, promptSessionDuration, ctx); err != nil {
+		if err := utils.SetPromptExpiry(team.TeamID, user.UserID, ctx); err != nil {
 			log.Printf("[ERROR] Failed to set prompt expiry for user %s in team %s: %v", user.UserID, team.TeamID, err)
 			continue
 		}

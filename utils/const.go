@@ -1,5 +1,5 @@
 package utils
 
 const (
-	promptTTL = 30
+	promptTTL = 3
 )

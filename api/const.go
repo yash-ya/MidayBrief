@@ -1,7 +1,5 @@
 package api
 
-import "time"
-
 const (
 	slackOAuthAuthorizeURL      = "https://slack.com/oauth/v2/authorize"
 	slackOAuthTokenURL          = "https://slack.com/api/oauth.v2.access"
@@ -10,7 +8,6 @@ const (
 	slackPostMessagesURL        = "https://slack.com/api/chat.postMessage"
 	slackUserInfoURL            = "https://slack.com/api/users.info"
 	slackUsersListURL           = "https://slack.com/api/users.list"
-	promptSessionDuration       = 15 * time.Hour
 	slackWelcomeMessageForAdmin = "Hey there, Admin! 👋 Thanks for installing *MidayBrief* — your team's stand-up assistant.\n\n" +
 		"I've auto-detected your timezone as *%s*. If that's not right, you can change it anytime with:\n" +
 		"`timezone Your/Timezone` (e.g., `timezone Europe/London`)\n\n" +
